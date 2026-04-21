@@ -333,7 +333,7 @@
             });
 
             const uniqueProviders = computed(() => {
-                const provs = records.value.map(r => (r.proveedor || '').toUpperCase().trim()).filter(p => p !== '');
+                const provs = records.value.map(r => String(r.proveedor || '').toUpperCase().trim()).filter(p => p !== '');
                 return [...new Set(provs)].sort();
             });
 
@@ -389,8 +389,8 @@
             const applyLatestDefaults = () => {
                 const latestRecord = getLatestRecord(records.value);
                 if(latestRecord) {
-                    if(latestRecord['DATOS DE FACTURACIÓN:']) form['DATOS DE FACTURACIÓN:'] = latestRecord['DATOS DE FACTURACIÓN:'].toUpperCase();
-                    if(latestRecord.obsercaviones) form.obsercaviones = latestRecord.obsercaviones.toUpperCase();
+                    if(latestRecord['DATOS DE FACTURACIÓN:']) form['DATOS DE FACTURACIÓN:'] = String(latestRecord['DATOS DE FACTURACIÓN:']).toUpperCase();
+                    if(latestRecord.obsercaviones) form.obsercaviones = String(latestRecord.obsercaviones).toUpperCase();
                 }
             };
 
@@ -465,13 +465,13 @@
                     const maxLen = Math.max(detArr.length, cantArr.length, unitArr.length, 1);
                     for(let i=0; i<maxLen; i++) {
                         newItems.push({
-                            detalle: (detArr[i] || '').toUpperCase(),
+                            detalle: String(detArr[i] || '').toUpperCase(),
                             cantidad: parseInt(cantArr[i] || 1),
                             unitario: parseInt(unitArr[i] || 0)
                         });
                     }
                     items.value = newItems;
-                } catch(e) { items.value = [{ detalle: (record.detalle||'').toUpperCase(), cantidad: parseInt(record.cantidad)||1, unitario: parseInt(record.unitario)||0 }]; }
+                } catch(e) { items.value = [{ detalle: String(record.detalle||'').toUpperCase(), cantidad: parseInt(record.cantidad)||1, unitario: parseInt(record.unitario)||0 }]; }
             };
 
             const handleAction = (mode) => {
@@ -487,10 +487,10 @@
                 if(!form.Correlativo) { showStatus('FALTA CORRELATIVO', true); return; }
                 form.Correlativo = cleanFormatNum(form.Correlativo);
                 const packItemsToForm = () => {
-                    form.detalle = items.value.map(i=>(i.detalle||'').toUpperCase()).join('\n');
-                    form.proveedor = (form.proveedor || '').toUpperCase();
-                    form.obsercaviones = (form.obsercaviones || '').toUpperCase();
-                    form['DATOS DE FACTURACIÓN:'] = (form['DATOS DE FACTURACIÓN:'] || '').toUpperCase();
+                    form.detalle = items.value.map(i=>String(i.detalle||'').toUpperCase()).join('\n');
+                    form.proveedor = String(form.proveedor || '').toUpperCase();
+                    form.obsercaviones = String(form.obsercaviones || '').toUpperCase();
+                    form['DATOS DE FACTURACIÓN:'] = String(form['DATOS DE FACTURACIÓN:'] || '').toUpperCase();
                     form['tasa de cambio'] = form['tipo de cambio'] !== 'CLP' ? currentRate.value : 1;
                     form.cantidad = items.value.map(i=>i.cantidad).join('\n');
                     form.unitario = items.value.map(i=>i.unitario).join('\n');

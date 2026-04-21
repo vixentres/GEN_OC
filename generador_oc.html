@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador OC - MOVYON</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="config.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { primary: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' } }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* PDF fixed layout */
+        #pdf-preview-container { 
+            width: 794px; 
+            height: 1123px; /* A4 aspect ratio at 96dpi */
+            background: white; 
+            color: black; 
+            padding: 40px; 
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; 
+            text-transform: uppercase;
+        }
+        .pdf-footer {
+            margin-top: auto;
+        }
+
+        .scoll-area { max-height: calc(100vh - 4rem); overflow-y: auto; }
+        
+        select::-webkit-scrollbar { width: 6px; }
+        select::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen overflow-hidden flex flex-col uppercase">
+
+<div id="app" class="flex flex-1 overflow-hidden" v-cloak>
+    
+    <!-- LEFT PANEL: CONTROLS & FORM -->
+    <div class="w-[45%] bg-white border-r shadow-lg z-10 flex flex-col">
+        <div class="p-4 border-b bg-slate-50 flex items-center justify-between">
+            <div>
+                <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2 text-primary-700">
+                    GESTOR ÓRDENES DE COMPRA
+                </h1>
+            </div>
+            
+            <div class="flex gap-2">
+                <button @click="resetToNew" class="px-3 py-1.5 bg-primary-600 text-white font-bold rounded shadow-sm hover:bg-primary-700 text-xs flex items-center transition" title="Crear OC desde cero">
+                    CREAR NUEVO
+                </button>
+                <button @click="loadData" class="px-3 py-1.5 bg-slate-200 text-slate-600 font-bold rounded hover:bg-slate-300 text-xs flex items-center shadow-sm" title="Actualizar datos">
+                    <span v-if="loading" class="animate-spin mr-1">↻</span>
+                    <span v-else class="mr-1">↻</span> ACTUALIZAR
+                </button>
+            </div>
+        </div>
+
+        <div class="p-4 border-b bg-slate-100 flex flex-col shadow-inner relative">
+            <div class="flex justify-between items-center mb-2">
+                <label class="text-xs font-bold text-slate-600 uppercase tracking-widest">BUSCADOR Y REGISTROS HISTÓRICOS</label>
+                <!-- Exchange rates info -->
+                <div class="flex gap-3 text-[9px] font-bold text-slate-500 bg-white/50 px-2 py-0.5 rounded border border-slate-200">
+                    <span>USD: ${{ exchangeRates.dolar || '...' }}</span>
+                    <span>EUR: ${{ exchangeRates.euro || '...' }}</span>
+                    <span>UF: ${{ exchangeRates.uf || '...' }}</span>
+                </div>
+            </div>
+            <div class="relative">
+                <input type="text" v-model="searchQuery" placeholder="BUSCAR POR CORRELATIVO O PROVEEDOR..." class="w-full px-3 py-2 text-sm border border-slate-300 rounded outline-none focus:ring-2 focus:ring-primary-400 bg-white shadow-sm font-medium uppercase">
+            </div>
+            
+            <div v-show="searchQuery.trim() !== '' && filteredRecords.length > 0" class="mt-2 bg-white border border-slate-300 rounded overflow-hidden shadow-sm">
+                <select v-model="selectedRecordId" size="4" class="w-full text-sm p-1 outline-none text-slate-700 bg-transparent uppercase">
+                    <option v-for="r in filteredRecords" :key="r.Correlativo" :value="r.Correlativo" class="py-1 px-2 border-b border-slate-50 cursor-pointer hover:bg-indigo-50">
+                        {{ cleanFormatNum(r.Correlativo) }} — {{ r.proveedor }}
+                    </option>
+                </select>
+            </div>
+            <div v-if="searchQuery.trim() !== '' && filteredRecords.length === 0" class="mt-1 text-xs text-slate-400 px-2 italic">NINGÚN RESULTADO COINCIDE CON LA CONSULTA.</div>
+
+            <div v-if="selectedRecordId && searchQuery.trim() !== ''" class="flex gap-2 mt-3">
+                <button @click="handleAction('copy')" class="flex-1 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-xs font-black shadow-[0_2px_4px_rgba(0,0,0,0.05)] hover:bg-indigo-100 transition hover:-translate-y-px uppercase">COPIAR (NUEVO CORRELATIVO)</button>
+                <button @click="handleAction('edit')" class="flex-1 py-2 bg-slate-200 border border-slate-300 text-slate-700 rounded text-xs font-black shadow-[0_2px_4px_rgba(0,0,0,0.05)] hover:bg-slate-300 transition hover:-translate-y-px uppercase">EDITAR REGISTRO ACTUAL</button>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-6 scoll-area text-sm bg-white border-b">
+            
+            <!-- FORM -->
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Nº Correlativo</label>
+                        <input type="text" v-model="form.Correlativo" class="w-full px-3 py-2 border rounded bg-yellow-50 focus:ring-2 focus:ring-yellow-400 outline-none font-bold text-slate-800 uppercase" placeholder="EJ: 219" title="Ingresar número correlativo">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Moneda (Tipo Cambio)</label>
+                        <div class="flex gap-2">
+                             <select v-model="form['tipo de cambio']" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm uppercase">
+                                <option value="CLP">CLP</option>
+                                <option value="UF">UF</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                            <div v-if="form['tipo de cambio'] !== 'CLP'" class="w-1/2">
+                                <input type="number" step="0.01" v-model.number="currentRate" class="w-full px-3 py-2 border rounded bg-slate-100 text-center font-bold text-slate-700 outline-none" title="Tasa de cambio personalizada">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1 uppercase text-slate-600">PROVEEDOR / COMPAÑÍA</label>
+                    <input type="text" v-model="form.proveedor" list="providers-list" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm text-base uppercase">
+                    <datalist id="providers-list">
+                        <option v-for="prov in uniqueProviders" :value="prov"></option>
+                    </datalist>
+                </div>
+
+                <!-- ITEMS LIST -->
+                <div class="border border-slate-200 rounded overflow-hidden my-4 shadow-sm relative">
+                    <div class="flex justify-between items-center bg-slate-800 px-3 py-2 border-b text-white">
+                        <label class="block text-[11px] font-black uppercase tracking-wider">DETALLE DEL REQUERIMIENTO</label>
+                        <button @click="addItem" class="px-2 py-1 bg-green-500 text-white rounded text-[10px] font-bold hover:bg-green-600 transition shadow-sm uppercase">AGREGAR LÍNEA</button>
+                    </div>
+                    
+                    <div class="p-2 bg-slate-50 space-y-2">
+                        <div v-for="(item, idx) in items" :key="idx" class="flex gap-2 items-center w-full relative group">
+                            
+                            <div class="w-4 text-center text-[9px] font-black text-slate-400 bg-slate-200 rounded-full h-4 leading-4">{{idx + 1}}</div>
+                            
+                            <input type="text" v-model="item.detalle" placeholder="DESCRIPCIÓN..." class="flex-1 w-1/2 px-2 py-1.5 text-xs border rounded outline-none focus:ring-1 focus:ring-primary-500 bg-white font-medium uppercase">
+                            <div class="flex gap-1 items-center w-48">
+                                <span class="text-[9px] text-slate-400 font-bold uppercase">CANT:</span>
+                                <input type="number" step="1" v-model.number="item.cantidad" class="w-12 px-1 py-1 text-center text-xs border rounded outline-none bg-white">
+                                <span class="text-[9px] text-slate-400 font-bold uppercase ml-1">P.U:</span>
+                                <input type="number" step="1" v-model.number="item.unitario" class="w-full px-1 py-1 text-right text-xs border rounded outline-none bg-white font-medium">
+                            </div>
+
+                            <button @click="removeItem(idx)" v-if="items.length > 1" class="w-6 h-6 flex justify-center items-center text-red-500 bg-red-50 rounded hover:bg-red-500 hover:text-white transition" title="Remover">-</button>
+                            <div v-else class="w-6 h-6"></div> 
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">DATOS DE FACTURACIÓN</label>
+                    <textarea v-model="form['DATOS DE FACTURACIÓN:']" rows="4" class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono bg-slate-50 leading-tight text-slate-700 uppercase"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider text-primary-700">OBSERVACIONES</label>
+                    <textarea v-model="form.obsercaviones" rows="3" class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono bg-slate-50 leading-tight text-slate-700 uppercase"></textarea>
+                </div>
+
+            </div>
+            
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="p-4 bg-slate-100 border-t shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] flex flex-col gap-3 z-10">
+            <button @click="saveData(false)" :disabled="saving" class="w-full py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[14px] transform hover:-translate-y-px uppercase">
+                <span v-if="saving">PROCESANDO...</span>
+                <span v-else>GUARDAR REGISTRO SOLO BD</span>
+            </button>
+            <button @click="saveData(true)" :disabled="saving" class="w-full py-3 bg-primary-700 hover:bg-primary-800 border border-primary-900 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[15px] transform hover:-translate-y-px uppercase">
+                 GUARDAR Y DESCARGAR PDF
+            </button>
+            <p v-if="statusMsg" class="text-center text-xs font-bold w-full uppercase" :class="statusIsError ? 'text-red-600' : 'text-slate-600'">{{ statusMsg }}</p>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: PREVIEW -->
+    <div class="w-[55%] bg-slate-700 flex flex-col items-center overflow-y-auto py-8 relative">
+        <label class="absolute top-2 left-4 text-[10px] text-slate-300 font-bold uppercase tracking-widest">VISTA PREVIA DEL DOCUMENTO COMPLETO</label>
+        
+        <!-- A4 Container -->
+        <div id="pdf-preview-container" class="shadow-2xl relative">
+            
+            <!-- HEADER -->
+            <div class="flex justify-between items-end border-b-2 border-slate-800 pb-3 mb-6">
+                <div>
+                    <!-- Logo -->
+                    <img src="https://my.ibtta.org/Portals/0/assets/images/account/Member-Logos/MOVYON_Logo.png" alt="MOVYON" class="h-[75px] object-contain">
+                </div>
+                <div class="text-right">
+                    <h2 class="text-3xl font-black text-slate-800 tracking-tight uppercase leading-none">ORDEN DE COMPRA</h2>
+                    <p class="text-xl font-black text-primary-700 mt-1">Nº {{ cleanFormatNum(form.Correlativo) }}</p>
+                    <p class="text-sm font-bold text-slate-500 mt-1">FECHA: {{ new Date().toLocaleDateString('es-CL') }}</p>
+                </div>
+            </div>
+
+            <!-- SUPPLIER -->
+            <div class="mb-6 mx-1 border-l-4 border-primary-600 pl-4 py-1 bg-slate-50">
+                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 uppercase">PROVEEDOR</h3>
+                <p class="text-lg font-black text-slate-800 uppercase leading-none">{{ form.proveedor || '-' }}</p>
+            </div>
+
+            <!-- TABLE -->
+            <table class="w-full border-collapse mb-2 mt-4">
+                <thead>
+                    <tr class="bg-slate-800 text-white border border-slate-800">
+                        <th class="py-2 px-2 text-center text-[10px] font-bold uppercase border-r border-slate-700 w-10">ITEM</th>
+                        <th class="py-2 px-3 text-left text-[11px] font-bold uppercase border-r border-slate-700">SERVICIO / PRODUCTO</th>
+                        <th class="py-2 px-2 text-center text-[10px] font-bold uppercase border-r border-slate-700 w-12">CANT.</th>
+                        <th class="py-2 px-3 text-right text-[11px] font-bold uppercase border-r border-slate-700">P. UNITARIO</th>
+                        <th class="py-2 px-3 text-right text-[11px] font-bold uppercase">MONTO TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(item, idx) in items" :key="idx" class="border-b border-l border-r border-slate-300">
+                        <td class="py-2 px-2 text-center text-[10px] font-bold text-slate-500 border-r border-slate-200 font-bold">{{idx + 1}}</td>
+                        <td class="py-2 px-3 text-[11px] text-slate-800 border-r border-slate-200 font-bold uppercase">{{ item.detalle || '-' }}</td>
+                        <td class="py-2 px-2 text-center text-[11px] font-bold border-r border-slate-200">{{ item.cantidad || 0 }}</td>
+                        <td class="py-2 px-3 text-right text-[10px] font-bold text-slate-600 border-r border-slate-200">{{ formatCurrency(item.unitario || 0, form['tipo de cambio']) }}</td>
+                        <td class="py-2 px-3 text-right font-black text-[11px] text-slate-800 bg-slate-50">{{ formatCurrency((item.cantidad || 0) * (item.unitario || 0), form['tipo de cambio']) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- TOTALS -->
+            <div class="flex justify-end mb-6 mt-4">
+                <div class="w-72 border-b-2 border-x-2 border-slate-800 bg-white">
+                    <table class="w-full text-xs">
+                        <tr class="bg-slate-50">
+                            <td class="py-3 px-3 font-black text-slate-800 text-right uppercase border-r border-slate-200">TOTAL {{ form['tipo de cambio'] }} NETO:</td>
+                            <td class="py-3 px-3 text-right font-black text-primary-700 text-[16px] leading-none">{{ formatCurrency(subtotalNeto, form['tipo de cambio']) }}</td>
+                        </tr>
+                        <!-- SUB-CALCULO EN CLP SI ES MONEDA EXTRANJERA -->
+                        <template v-if="form['tipo de cambio'] !== 'CLP'">
+                            <tr class="bg-slate-200 text-[9px]">
+                                <td colspan="2" class="py-1 px-3 text-center border-t border-slate-800 font-bold text-slate-600">(TC: ${{ formatCurrency(currentRate) }})</td>
+                            </tr>
+                            <tr class="text-[10px]">
+                                <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">TOTAL NETO CLP:</td>
+                                <td class="py-1 px-3 text-right font-bold text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate, 'CLP') }}</td>
+                            </tr>
+                            <tr class="text-[10px]">
+                                <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
+                                <td class="py-1 px-3 text-right font-bold text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate * 0.19, 'CLP') }}</td>
+                            </tr>
+                            <tr class="bg-slate-100 font-black text-[11px]">
+                                <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL CLP:</td>
+                                <td class="py-2 px-3 text-right text-primary-800">{{ formatCurrency(subtotalNeto * currentRate * 1.19, 'CLP') }}</td>
+                            </tr>
+                        </template>
+                        <!-- SOLO CLP -->
+                        <template v-else>
+                            <tr class="text-[11px]">
+                                <td class="py-1.5 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
+                                <td class="py-1.5 px-3 text-right font-black text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * 0.19, 'CLP') }}</td>
+                            </tr>
+                            <tr class="bg-slate-100 font-black text-[13px]">
+                                <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL FINAL:</td>
+                                <td class="py-2 px-3 text-right text-primary-800">CLP {{ formatCurrency(subtotalNeto * 1.19, 'CLP') }}</td>
+                            </tr>
+                        </template>
+                    </table>
+                </div>
+            </div>
+
+            <!-- WRAPPER ANCHORED TO BOTTOM -->
+            <div class="pdf-footer w-full flex flex-col border-2 border-slate-800 bg-white">
+                <div class="p-3 border-b-2 border-slate-800 bg-slate-50/50 text-[10px] font-mono leading-tight">
+                    <span class="font-bold text-slate-800 text-[11px] block mb-1 uppercase tracking-wide">DATOS DE FACTURACIÓN:</span>
+                    <div class="whitespace-pre-wrap text-slate-800 font-bold uppercase">{{ form['DATOS DE FACTURACIÓN:'] }}</div>
+                </div>
+
+                <div class="p-3 bg-yellow-50/10 text-[10px] font-mono leading-tight">
+                    <span class="font-bold text-slate-800 text-[11px] block mb-1 uppercase tracking-wide">OBSERVACIONES:</span>
+                    <div class="whitespace-pre-wrap text-slate-700 uppercase font-semibold">{{ form.obsercaviones }}</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, onMounted, reactive, computed, watch } = Vue;
+
+    createApp({
+        setup() {
+            const scriptUrl = typeof env !== 'undefined' ? env.SCRIPT_URL : "https://script.google.com/macros/s/AKfycbwFmWCcuqaa09UEBbezoHY_7XR3VKphwivP1qPeoi14YZTLl2JZrxgnU5j5p1f18-8L/exec";
+            const records = ref([]);
+            const filteredRecords = ref([]);
+            const loading = ref(false);
+            const saving = ref(false);
+            
+            const searchQuery = ref('');
+            const selectedRecordId = ref('');
+            const statusMsg = ref('');
+            const statusIsError = ref(false);
+
+            const exchangeRates = reactive({ uf: 0, dolar: 0, euro: 0 });
+            const currentRate = ref(1);
+
+            const items = ref([{ detalle: '', cantidad: 1, unitario: 0 }]);
+            const addItem = () => items.value.push({ detalle: '', cantidad: 1, unitario: 0 });
+            const removeItem = (idx) => { if (items.value.length > 1) items.value.splice(idx, 1); };
+
+            const defaultFact = "NOMBRE: MOVYON SPA AGENCIA EN CHILE SPA\nRUT: 76.416.097-5\nDIRECCION: A.BARROS ERRAZURIZ N°1954 OFICINA 1109 COMUNA PROVIDENCIA, CIUDAD SANTIAGO.\nCONTACTO: FELIPE.EDWARDS@MOVYON.COM | GIOVANNI.DORE@MOVYON.COM".toUpperCase();
+            const defaultObs = "Indirizzo di spedizione: Street: Av el ventisquero 1204\nOffice: bodega 41\nDistrict: Renca |City: Santiago".toUpperCase();
+
+            const getDefaultForm = () => ({
+                "Correlativo": "",
+                "proveedor": "",
+                "cantidad": "",
+                "detalle": "",
+                "unitario": "",
+                "tipo de cambio": "CLP",
+                "pie de pagina": "",
+                "obsercaviones": defaultObs,
+                "DATOS DE FACTURACIÓN:": defaultFact
+            });
+
+            const form = reactive(getDefaultForm());
+
+            const subtotalNeto = computed(() => {
+                return items.value.reduce((sum, i) => sum + ((parseFloat(i.cantidad) || 0) * (parseFloat(i.unitario) || 0)), 0);
+            });
+
+            const uniqueProviders = computed(() => {
+                const provs = records.value.map(r => (r.proveedor || '').toUpperCase().trim()).filter(p => p !== '');
+                return [...new Set(provs)].sort();
+            });
+
+            const formatCurrency = (val, currency = 'CLP') => {
+                if(!val && val !== 0) return '0';
+                const decimals = (currency === 'CLP') ? 0 : 2;
+                return Number(val).toLocaleString('es-CL', {
+                    minimumFractionDigits: decimals,
+                    maximumFractionDigits: decimals
+                });
+            };
+
+            const cleanFormatNum = (str) => String(str || 'XXX').toUpperCase().replace(/O\s*C\s*/g, '').trim();
+
+            const updateCurrentRate = () => {
+                if (form['tipo de cambio'] === 'USD') currentRate.value = exchangeRates.dolar;
+                else if (form['tipo de cambio'] === 'EUR') currentRate.value = exchangeRates.euro;
+                else if (form['tipo de cambio'] === 'UF') currentRate.value = exchangeRates.uf;
+                else currentRate.value = 1;
+            };
+
+            watch(() => form['tipo de cambio'], updateCurrentRate);
+
+            const getLatestRecord = (dataArray) => {
+                let maxNum = -1;
+                let latestRec = null;
+                dataArray.forEach(r => {
+                    if(r.Correlativo) {
+                        const match = String(r.Correlativo).match(/\d+/);
+                        if(match) {
+                            const num = parseInt(match[0], 10);
+                            if(num > maxNum) { maxNum = num; latestRec = r; }
+                        }
+                    }
+                });
+                return latestRec;
+            };
+
+            const calculateMaxCorrelativo = (dataArray) => {
+                let maxNum = 0;
+                dataArray.forEach(r => {
+                    if(r.Correlativo) {
+                        const match = String(r.Correlativo).match(/\d+/);
+                        if(match) {
+                            const num = parseInt(match[0], 10);
+                            if(num > maxNum) maxNum = num;
+                        }
+                    }
+                });
+                return `${maxNum + 1}`;
+            };
+
+            const applyLatestDefaults = () => {
+                const latestRecord = getLatestRecord(records.value);
+                if(latestRecord) {
+                    if(latestRecord['DATOS DE FACTURACIÓN:']) form['DATOS DE FACTURACIÓN:'] = latestRecord['DATOS DE FACTURACIÓN:'].toUpperCase();
+                    if(latestRecord.obsercaviones) form.obsercaviones = latestRecord.obsercaviones.toUpperCase();
+                }
+            };
+
+            const resetToNew = () => {
+                searchQuery.value = '';
+                selectedRecordId.value = '';
+                Object.assign(form, getDefaultForm());
+                form.Correlativo = calculateMaxCorrelativo(records.value);
+                applyLatestDefaults();
+                items.value = [{ detalle: '', cantidad: 1, unitario: 0 }];
+                showStatus('FORMULARIO REINICIALIZADO', false);
+            };
+
+            const loadData = async () => {
+                loading.value = true;
+                showStatus('SINCRONIZANDO...', false);
+                try {
+                    const req = await fetch(scriptUrl);
+                    const jsonPayload = await req.json();
+                    
+                    // Nuevo formato desde Apps Script
+                    const data = jsonPayload.records;
+                    
+                    if(jsonPayload.rates) {
+                        exchangeRates.dolar = jsonPayload.rates.usd || exchangeRates.dolar;
+                        exchangeRates.euro = jsonPayload.rates.eur || exchangeRates.euro;
+                        exchangeRates.uf = jsonPayload.rates.uf || exchangeRates.uf;
+                        updateCurrentRate();
+                    }
+
+                    records.value = data;
+                    if(!selectedRecordId.value && !form.proveedor) {
+                        form.Correlativo = calculateMaxCorrelativo(data);
+                        applyLatestDefaults();
+                    }
+                    showStatus('CONEXIÓN EXITOSA', false);
+                } catch(e) {
+                    showStatus('ERROR DE CONEXIÓN', true);
+                }
+                loading.value = false;
+            };
+
+            watch(() => form.Correlativo, (newV) => {
+                const q = cleanFormatNum(newV);
+                if(!q || loading.value) return;
+                const match = records.value.find(r => cleanFormatNum(r.Correlativo) === q);
+                if(match && selectedRecordId.value !== match.Correlativo) {
+                    searchQuery.value = match.Correlativo;
+                    selectedRecordId.value = match.Correlativo;
+                }
+            });
+
+            watch(selectedRecordId, (newId) => {
+                const rec = records.value.find(r => r.Correlativo == newId);
+                if(rec) {
+                    Object.keys(form).forEach(k => { if(rec[k] !== undefined) form[k] = rec[k]; });
+                    parseDbItems(rec);
+                }
+            });
+
+            const parseDbItems = (record) => {
+                try {
+                    const detArr = record.detalle ? record.detalle.toString().split('\n') : [];
+                    const cantArr = record.cantidad ? record.cantidad.toString().split('\n') : [];
+                    const unitArr = record.unitario ? record.unitario.toString().split('\n') : [];
+                    let newItems = [];
+                    const maxLen = Math.max(detArr.length, cantArr.length, unitArr.length, 1);
+                    for(let i=0; i<maxLen; i++) {
+                        newItems.push({
+                            detalle: (detArr[i] || '').toUpperCase(),
+                            cantidad: parseInt(cantArr[i] || 1),
+                            unitario: parseInt(unitArr[i] || 0)
+                        });
+                    }
+                    items.value = newItems;
+                } catch(e) { items.value = [{ detalle: (record.detalle||'').toUpperCase(), cantidad: parseInt(record.cantidad)||1, unitario: parseInt(record.unitario)||0 }]; }
+            };
+
+            const handleAction = (mode) => {
+                if(mode === 'copy') {
+                    form.Correlativo = calculateMaxCorrelativo(records.value);
+                    applyLatestDefaults();
+                }
+                searchQuery.value = '';
+                selectedRecordId.value = '';
+            };
+
+            const saveData = async (withPdf = false) => {
+                if(!form.Correlativo) { showStatus('FALTA CORRELATIVO', true); return; }
+                form.Correlativo = cleanFormatNum(form.Correlativo);
+                const packItemsToForm = () => {
+                    form.detalle = items.value.map(i=>(i.detalle||'').toUpperCase()).join('\n');
+                    form.proveedor = (form.proveedor || '').toUpperCase();
+                    form.obsercaviones = (form.obsercaviones || '').toUpperCase();
+                    form['DATOS DE FACTURACIÓN:'] = (form['DATOS DE FACTURACIÓN:'] || '').toUpperCase();
+                    form['tasa de cambio'] = form['tipo de cambio'] !== 'CLP' ? currentRate.value : 1;
+                    form.cantidad = items.value.map(i=>i.cantidad).join('\n');
+                    form.unitario = items.value.map(i=>i.unitario).join('\n');
+                };
+                packItemsToForm();
+                saving.value = true;
+                try {
+                    const req = await fetch(scriptUrl, {
+                        method: 'POST',
+                        body: JSON.stringify(form),
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                    });
+                    const res = await req.json();
+                    if(res.status === 'success') {
+                        showStatus(res.updated ? 'REGISTRO ACTUALIZADO' : 'NUEVO REGISTRO GUARDADO', false);
+                        await loadData();
+                        if(withPdf) generatePDF();
+                    }
+                } catch(e) { showStatus('ERROR DE TRANSMISIÓN', true); }
+                saving.value = false;
+                setTimeout(() => { if(!statusIsError.value) statusMsg.value = ''; }, 3000);
+            };
+
+            const generatePDF = () => {
+                const element = document.getElementById('pdf-preview-container');
+                const opt = {
+                    margin: 0,
+                    filename: `OC ${cleanFormatNum(form.Correlativo)} ${(form.proveedor||'').toUpperCase()}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' }
+                };
+                html2pdf().set(opt).from(element).save();
+            };
+
+            const showStatus = (msg, isErr) => { statusMsg.value = msg; statusIsError.value = isErr; };
+
+            onMounted(() => {
+                loadData();
+            });
+
+            return {
+                records, filteredRecords, loading, saving, form, formatCurrency, cleanFormatNum,
+                items, addItem, removeItem, searchQuery, selectedRecordId, exchangeRates, currentRate,
+                loadData, handleAction, resetToNew, saveData, generatePDF, statusMsg, statusIsError,
+                subtotalNeto, uniqueProviders
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

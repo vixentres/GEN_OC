@@ -411,14 +411,19 @@
                     const req = await fetch(scriptUrl);
                     const jsonPayload = await req.json();
                     
-                    // Nuevo formato desde Apps Script
-                    const data = jsonPayload.records;
-                    
-                    if(jsonPayload.rates) {
-                        exchangeRates.dolar = jsonPayload.rates.usd || exchangeRates.dolar;
-                        exchangeRates.euro = jsonPayload.rates.eur || exchangeRates.euro;
-                        exchangeRates.uf = jsonPayload.rates.uf || exchangeRates.uf;
-                        updateCurrentRate();
+                    let data = [];
+                    // Validar si el script en la nube sigue siendo la versión antigua (Array puro)
+                    if (Array.isArray(jsonPayload)) {
+                        data = jsonPayload;
+                    } else {
+                        // Nuevo formato desde Apps Script
+                        data = jsonPayload.records || [];
+                        if(jsonPayload.rates) {
+                            exchangeRates.dolar = jsonPayload.rates.usd || exchangeRates.dolar;
+                            exchangeRates.euro = jsonPayload.rates.eur || exchangeRates.euro;
+                            exchangeRates.uf = jsonPayload.rates.uf || exchangeRates.uf;
+                            updateCurrentRate();
+                        }
                     }
 
                     records.value = data;

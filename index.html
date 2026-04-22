@@ -37,68 +37,89 @@
             margin-top: auto;
         }
 
-        .scoll-area { max-height: calc(100vh - 4rem); overflow-y: auto; }
+        /* Vue Cloak */
+        [v-cloak] { display: none; }
         
         select::-webkit-scrollbar { width: 6px; }
         select::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans h-screen overflow-hidden flex flex-col uppercase">
+<body class="bg-slate-50 text-slate-800 font-sans uppercase lg:h-screen lg:overflow-hidden">
 
-<div id="app" class="flex flex-1 overflow-hidden" v-cloak>
+<!-- Wrapper principal con ajuste responsivo (scroll completo en movil, paneles divididos en desktop) -->
+<div id="app" class="flex flex-col lg:flex-row w-full min-h-screen lg:min-h-0 lg:h-full" v-cloak>
     
     <!-- LEFT PANEL: CONTROLS & FORM -->
-    <div class="w-[45%] bg-white border-r shadow-lg z-10 flex flex-col">
-        <div class="p-4 border-b bg-slate-50 flex items-center justify-between relative shadow-inner">
+    <div class="w-full lg:w-[45%] flex flex-col bg-white border-b lg:border-b-0 lg:border-r shadow-lg z-10 shrink-0 lg:shrink lg:h-full">
+        
+        <!-- Header -->
+        <div class="p-4 border-b bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-inner shrink-0">
             <div>
-                <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2 text-primary-700">
+                <h1 class="text-lg lg:text-xl font-bold text-slate-800 flex items-center gap-2 text-primary-700">
                     GESTOR ÓRDENES DE COMPRA
                 </h1>
-                <div class="flex gap-3 mt-1 text-[9px] font-bold text-slate-500">
+                <div class="flex flex-wrap gap-2 lg:gap-3 mt-1 text-[9px] font-bold text-slate-500">
                     <span>USD: ${{ exchangeRates.dolar ? formatCurrency(exchangeRates.dolar, 'USD') : '...' }}</span>
                     <span>EUR: ${{ exchangeRates.euro ? formatCurrency(exchangeRates.euro, 'USD') : '...' }}</span>
                     <span>UF: ${{ exchangeRates.uf ? formatCurrency(exchangeRates.uf, 'USD') : '...' }}</span>
                 </div>
             </div>
             
-            <div class="flex gap-2 relative z-10">
-                <button @click="resetToNew" class="px-3 py-1.5 bg-primary-600 text-white font-bold rounded shadow-sm hover:bg-primary-700 text-xs flex items-center transition" title="Crear OC desde cero">
+            <div class="flex gap-2 w-full sm:w-auto justify-end relative z-10">
+                <button @click="resetToNew" class="px-3 py-2 sm:py-1.5 bg-primary-600 text-white font-bold rounded shadow-sm hover:bg-primary-700 text-xs flex items-center transition" title="Crear OC desde cero">
                     CREAR NUEVO
                 </button>
-                <button @click="loadData" class="px-3 py-1.5 bg-slate-200 text-slate-600 font-bold rounded hover:bg-slate-300 text-xs flex items-center shadow-sm" title="Actualizar datos">
+                <button @click="loadData" class="px-3 py-2 sm:py-1.5 bg-slate-200 text-slate-600 font-bold rounded hover:bg-slate-300 text-xs flex items-center shadow-sm" title="Actualizar datos">
                     <span v-if="loading" class="animate-spin mr-1">↻</span>
                     <span v-else class="mr-1">↻</span> ACTUALIZAR
                 </button>
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-6 space-y-6 scoll-area text-sm bg-white border-b">
+        <!-- Form Área Scrolleable -->
+        <div class="flex-1 lg:overflow-y-auto p-4 lg:p-6 space-y-6 text-sm bg-white">
             
-            <!-- FORM -->
             <div class="space-y-4">
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Validación del Folio Responsiva -->
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Nº Correlativo / Histórico</label>
-                        <input type="text" v-model="form.Correlativo" list="correlativos-list" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-2 outline-none font-bold text-slate-800 uppercase" :class="isLocked ? 'bg-slate-200 cursor-not-allowed border-slate-300' : 'bg-yellow-50 focus:ring-yellow-400 border-slate-200'" placeholder="BUSCAR O CREAR..." autocomplete="off">
+                        <input type="text" v-model="form.Correlativo" list="correlativos-list" :disabled="isLocked" 
+                               class="w-full px-3 py-2 border rounded focus:ring-2 outline-none font-bold text-slate-800 uppercase transition-all" 
+                               :class="[
+                                   isLocked ? 'bg-slate-200 cursor-not-allowed border-slate-300' : 'bg-yellow-50 focus:ring-yellow-400 border-slate-200',
+                                   folioError ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-400 bg-red-50' : ''
+                               ]" 
+                               placeholder="BUSCAR O CREAR..." autocomplete="off">
                         <datalist id="correlativos-list">
                             <option v-for="r in correlativosList" :value="r"></option>
                         </datalist>
+                        
+                        <!-- Mensaje de Error si el folio excede el límite -->
+                        <div v-if="folioError" class="text-[10px] text-red-600 font-bold mt-1 uppercase flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                            MÁXIMO PERMITIDO: {{ maxAllowedValue }}
+                        </div>
                         
                         <div v-if="isLocked" class="flex gap-2 mt-2">
                             <button @click="handleAction('copy')" class="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded text-[10px] font-black shadow-sm uppercase transition">COPIAR NUEVO</button>
                             <button @click="handleAction('edit')" class="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 border border-slate-300 text-slate-700 rounded text-[10px] font-black shadow-sm uppercase transition">MODIFICAR</button>
                         </div>
                     </div>
+
+                    <!-- Tipo Cambio -->
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Moneda (Tipo Cambio)</label>
                         <div class="flex gap-2">
-                             <select v-model="form['tipo de cambio']" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm uppercase disabled:bg-slate-100 disabled:text-slate-400">
+                             <select v-model="form['tipo de cambio']" :disabled="isLocked" class="flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm uppercase disabled:bg-slate-100 disabled:text-slate-400">
                                 <option value="CLP">CLP</option>
                                 <option value="UF">UF</option>
                                 <option value="USD">USD</option>
                                 <option value="EUR">EUR</option>
                             </select>
-                            <div v-if="form['tipo de cambio'] !== 'CLP'" class="w-1/2">
+                            <div v-if="form['tipo de cambio'] !== 'CLP'" class="w-1/2 md:w-2/5">
                                 <input type="number" step="0.01" v-model.number="currentRate" :disabled="isLocked" class="w-full px-3 py-2 border rounded text-center font-bold outline-none disabled:text-slate-400" :class="isLocked ? 'bg-slate-200 border-slate-300' : 'bg-slate-100 text-slate-700'">
                             </div>
                         </div>
@@ -113,28 +134,34 @@
                     </datalist>
                 </div>
 
-                <!-- ITEMS LIST -->
-                <div class="border border-slate-200 rounded overflow-hidden my-4 shadow-sm relative" :class="isLocked ? 'opacity-70 pointer-events-none' : ''">
+                <!-- ITEMS LIST (Responsivo para móviles) -->
+                <div class="border border-slate-200 rounded overflow-hidden my-4 shadow-sm relative bg-slate-50" :class="isLocked ? 'opacity-70 pointer-events-none' : ''">
                     <div class="flex justify-between items-center bg-slate-800 px-3 py-2 border-b text-white">
                         <label class="block text-[11px] font-black uppercase tracking-wider">DETALLE DEL REQUERIMIENTO</label>
                         <button @click="addItem" :disabled="isLocked" class="px-2 py-1 bg-green-500 text-white rounded text-[10px] font-bold hover:bg-green-600 transition shadow-sm uppercase">AGREGAR LÍNEA</button>
                     </div>
                     
-                    <div class="p-2 bg-slate-50 space-y-2">
-                        <div v-for="(item, idx) in items" :key="idx" class="flex gap-2 items-center w-full relative group">
+                    <div class="p-2 space-y-3 md:space-y-2">
+                        <div v-for="(item, idx) in items" :key="idx" class="flex flex-col md:flex-row gap-2 items-start md:items-center w-full relative group bg-white p-3 md:p-1 border md:border-none rounded shadow-sm md:shadow-none">
                             
-                            <div class="w-4 text-center text-[9px] font-black text-slate-400 bg-slate-200 rounded-full h-4 leading-4">{{idx + 1}}</div>
-                            
-                            <input type="text" v-model="item.detalle" placeholder="DESCRIPCIÓN..." :disabled="isLocked" class="flex-1 w-1/2 px-2 py-1.5 text-xs border rounded outline-none focus:ring-1 focus:ring-primary-500 bg-white font-medium uppercase disabled:bg-transparent">
-                            <div class="flex gap-1 items-center w-48">
-                                <span class="text-[9px] text-slate-400 font-bold uppercase">CANT:</span>
-                                <input type="number" step="1" v-model.number="item.cantidad" :disabled="isLocked" class="w-12 px-1 py-1 text-center text-xs border rounded outline-none bg-white disabled:bg-transparent">
-                                <span class="text-[9px] text-slate-400 font-bold uppercase ml-1">P.U:</span>
-                                <input type="number" step="1" v-model.number="item.unitario" :disabled="isLocked" class="w-full px-1 py-1 text-right text-xs border rounded outline-none bg-white font-medium disabled:bg-transparent">
+                            <div class="flex gap-2 items-center w-full md:w-auto md:flex-1">
+                                <div class="w-5 shrink-0 text-center text-[10px] font-black text-slate-400 bg-slate-200 rounded-full h-5 leading-5">{{idx + 1}}</div>
+                                <input type="text" v-model="item.detalle" placeholder="DESCRIPCIÓN..." :disabled="isLocked" class="flex-1 w-full px-2 py-1.5 text-xs border rounded outline-none focus:ring-1 focus:ring-primary-500 bg-white font-medium uppercase disabled:bg-transparent">
                             </div>
+                            
+                            <div class="flex gap-2 items-center w-full md:w-auto pl-7 md:pl-0">
+                                <div class="flex gap-1 items-center w-28 shrink-0">
+                                    <span class="text-[9px] text-slate-400 font-bold uppercase">CANT:</span>
+                                    <input type="number" step="1" v-model.number="item.cantidad" :disabled="isLocked" class="w-full px-1 py-1.5 text-center text-xs border rounded outline-none bg-white disabled:bg-transparent">
+                                </div>
+                                <div class="flex gap-1 items-center flex-1 md:w-32">
+                                    <span class="text-[9px] text-slate-400 font-bold uppercase md:ml-1">P.U:</span>
+                                    <input type="number" step="1" v-model.number="item.unitario" :disabled="isLocked" class="w-full px-2 py-1.5 text-right text-xs border rounded outline-none bg-white font-medium disabled:bg-transparent">
+                                </div>
 
-                            <button @click="removeItem(idx)" v-if="items.length > 1 && !isLocked" class="w-6 h-6 flex justify-center items-center text-red-500 bg-red-50 rounded hover:bg-red-500 hover:text-white transition" title="Remover">-</button>
-                            <div v-else class="w-6 h-6"></div> 
+                                <button @click="removeItem(idx)" v-if="items.length > 1 && !isLocked" class="w-8 h-8 md:w-6 md:h-6 shrink-0 flex justify-center items-center text-red-500 bg-red-50 rounded hover:bg-red-500 hover:text-white transition" title="Remover">-</button>
+                                <div v-else class="w-8 h-8 md:w-6 md:h-6 shrink-0"></div> 
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -153,14 +180,14 @@
             
         </div>
 
-        <!-- ACTIONS -->
-        <div class="p-4 bg-slate-100 border-t shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] flex flex-col gap-3 z-10">
+        <!-- ACTIONS FOOTER -->
+        <div class="p-4 bg-slate-100 border-t shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] flex flex-col gap-3 shrink-0 z-10">
             <template v-if="!isLocked">
-                <button @click="saveData(false)" :disabled="saving" class="w-full py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[14px] transform hover:-translate-y-px uppercase">
+                <button @click="saveData(false)" :disabled="saving || folioError" class="w-full py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[14px] disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-px uppercase">
                     <span v-if="saving">PROCESANDO...</span>
                     <span v-else>GUARDAR REGISTRO SOLO BD</span>
                 </button>
-                <button @click="saveData(true)" :disabled="saving" class="w-full py-3 bg-primary-700 hover:bg-primary-800 border border-primary-900 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[15px] transform hover:-translate-y-px uppercase">
+                <button @click="saveData(true)" :disabled="saving || folioError" class="w-full py-3 bg-primary-700 hover:bg-primary-800 border border-primary-900 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[15px] disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-px uppercase">
                      GUARDAR Y DESCARGAR PDF
                 </button>
             </template>
@@ -172,107 +199,112 @@
     </div>
 
     <!-- RIGHT PANEL: PREVIEW -->
-    <div class="w-[55%] bg-slate-700 flex flex-col items-center overflow-y-auto py-8 relative">
-        <label class="absolute top-2 left-4 text-[10px] text-slate-300 font-bold uppercase tracking-widest">VISTA PREVIA DEL DOCUMENTO COMPLETO</label>
+    <div class="w-full lg:w-[55%] flex flex-col items-center py-8 bg-slate-700 shrink-0 lg:shrink lg:h-full lg:overflow-y-auto relative">
+        <label class="absolute top-2 left-4 text-[10px] text-slate-300 font-bold uppercase tracking-widest hidden lg:block">VISTA PREVIA DEL DOCUMENTO</label>
         
-        <!-- A4 Container -->
-        <div id="pdf-preview-container" class="shadow-2xl relative">
-            
-            <!-- HEADER -->
-            <div class="flex justify-between items-end border-b-2 border-slate-800 pb-3 mb-6">
-                <div>
-                    <!-- Logo -->
-                    <img src="https://raw.githubusercontent.com/vixentres/GEN_OC/main/MOVYON_Logo.png" alt="MOVYON" class="h-[75px] object-contain">
-                </div>
-                <div class="text-right">
-                    <h2 class="text-3xl font-black text-slate-800 tracking-tight uppercase leading-none">ORDEN DE COMPRA</h2>
-                    <p class="text-xl font-black text-primary-700 mt-1">Nº {{ cleanFormatNum(form.Correlativo) }}</p>
-                    <p class="text-sm font-bold text-slate-500 mt-1">FECHA: {{ new Date().toLocaleDateString('es-CL') }}</p>
-                </div>
-            </div>
+        <!-- Envoltorio para Scroll Horizontal del PDF en móviles -->
+        <div class="w-full overflow-x-auto flex lg:justify-center px-4">
+            <div class="min-w-max pb-8"> <!-- Mantiene los márgenes correctos en el scroll horizontal -->
+                <!-- A4 Container (Fijo en pixeles para perfecta generacion PDF) -->
+                <div id="pdf-preview-container" class="shadow-2xl relative shrink-0">
+                    
+                    <!-- HEADER -->
+                    <div class="flex justify-between items-end border-b-2 border-slate-800 pb-3 mb-6">
+                        <div>
+                            <!-- Logo -->
+                            <img src="https://raw.githubusercontent.com/vixentres/GEN_OC/main/MOVYON_Logo.png" alt="MOVYON" class="h-[75px] object-contain">
+                        </div>
+                        <div class="text-right">
+                            <h2 class="text-3xl font-black text-slate-800 tracking-tight uppercase leading-none">ORDEN DE COMPRA</h2>
+                            <p class="text-xl font-black text-primary-700 mt-1">Nº {{ cleanFormatNum(form.Correlativo) }}</p>
+                            <p class="text-sm font-bold text-slate-500 mt-1">FECHA: {{ new Date().toLocaleDateString('es-CL') }}</p>
+                        </div>
+                    </div>
 
-            <!-- SUPPLIER -->
-            <div class="mb-6 mx-1 border-l-4 border-primary-600 pl-4 py-1 bg-slate-50">
-                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 uppercase">PROVEEDOR</h3>
-                <p class="text-lg font-black text-slate-800 uppercase leading-none">{{ form.proveedor || '-' }}</p>
-            </div>
+                    <!-- SUPPLIER -->
+                    <div class="mb-6 mx-1 border-l-4 border-primary-600 pl-4 py-1 bg-slate-50">
+                        <h3 class="text-[10px] font-bold text-slate-400 tracking-wider mb-1 uppercase">PROVEEDOR</h3>
+                        <p class="text-lg font-black text-slate-800 uppercase leading-none">{{ form.proveedor || '-' }}</p>
+                    </div>
 
-            <!-- TABLE -->
-            <table class="w-full border-collapse mb-2 mt-4">
-                <thead>
-                    <tr class="bg-slate-800 text-white border border-slate-800">
-                        <th class="py-2 px-2 text-center text-[10px] font-bold uppercase border-r border-slate-700 w-10">ITEM</th>
-                        <th class="py-2 px-3 text-left text-[11px] font-bold uppercase border-r border-slate-700">SERVICIO / PRODUCTO</th>
-                        <th class="py-2 px-2 text-center text-[10px] font-bold uppercase border-r border-slate-700 w-12">CANT.</th>
-                        <th class="py-2 px-3 text-right text-[11px] font-bold uppercase border-r border-slate-700">P. UNITARIO</th>
-                        <th class="py-2 px-3 text-right text-[11px] font-bold uppercase">MONTO TOTAL</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(item, idx) in items" :key="idx" class="border-b border-l border-r border-slate-300">
-                        <td class="py-2 px-2 text-center text-[10px] font-bold text-slate-500 border-r border-slate-200 font-bold">{{idx + 1}}</td>
-                        <td class="py-2 px-3 text-[11px] text-slate-800 border-r border-slate-200 font-bold uppercase">{{ item.detalle || '-' }}</td>
-                        <td class="py-2 px-2 text-center text-[11px] font-bold border-r border-slate-200">{{ item.cantidad || 0 }}</td>
-                        <td class="py-2 px-3 text-right text-[10px] font-bold text-slate-600 border-r border-slate-200">{{ formatCurrency(item.unitario || 0, form['tipo de cambio']) }}</td>
-                        <td class="py-2 px-3 text-right font-black text-[11px] text-slate-800 bg-slate-50">{{ formatCurrency((item.cantidad || 0) * (item.unitario || 0), form['tipo de cambio']) }}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <!-- TOTALS -->
-            <div class="flex justify-end mb-6 mt-4">
-                <div class="w-72 border-b-2 border-x-2 border-slate-800 bg-white">
-                    <table class="w-full text-xs">
-                        <tr class="bg-slate-50">
-                            <td class="py-3 px-3 font-black text-slate-800 text-right uppercase border-r border-slate-200">TOTAL {{ form['tipo de cambio'] }} NETO:</td>
-                            <td class="py-3 px-3 text-right font-black text-primary-700 text-[16px] leading-none">{{ formatCurrency(subtotalNeto, form['tipo de cambio']) }}</td>
-                        </tr>
-                        <!-- SUB-CALCULO EN CLP SI ES MONEDA EXTRANJERA -->
-                        <template v-if="form['tipo de cambio'] !== 'CLP'">
-                            <tr class="bg-slate-200 text-[9px]">
-                                <td colspan="2" class="py-1 px-3 text-center border-t border-slate-800 font-bold text-slate-600">(TC: ${{ formatCurrency(currentRate, 'USD') }})</td>
+                    <!-- TABLE -->
+                    <table class="w-full border-collapse mb-2 mt-4">
+                        <thead>
+                            <tr class="bg-slate-800 text-white border border-slate-800">
+                                <th class="py-2 px-2 text-center text-[10px] font-bold uppercase border-r border-slate-700 w-10">ITEM</th>
+                                <th class="py-2 px-3 text-left text-[11px] font-bold uppercase border-r border-slate-700">SERVICIO / PRODUCTO</th>
+                                <th class="py-2 px-2 text-center text-[10px] font-bold uppercase border-r border-slate-700 w-12">CANT.</th>
+                                <th class="py-2 px-3 text-right text-[11px] font-bold uppercase border-r border-slate-700">P. UNITARIO</th>
+                                <th class="py-2 px-3 text-right text-[11px] font-bold uppercase">MONTO TOTAL</th>
                             </tr>
-                            <tr class="text-[10px]">
-                                <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">TOTAL NETO CLP:</td>
-                                <td class="py-1 px-3 text-right font-bold text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate, 'CLP') }}</td>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(item, idx) in items" :key="idx" class="border-b border-l border-r border-slate-300">
+                                <td class="py-2 px-2 text-center text-[10px] font-bold text-slate-500 border-r border-slate-200">{{idx + 1}}</td>
+                                <td class="py-2 px-3 text-[11px] text-slate-800 border-r border-slate-200 font-bold uppercase">{{ item.detalle || '-' }}</td>
+                                <td class="py-2 px-2 text-center text-[11px] font-bold border-r border-slate-200">{{ item.cantidad || 0 }}</td>
+                                <td class="py-2 px-3 text-right text-[10px] font-bold text-slate-600 border-r border-slate-200">{{ formatCurrency(item.unitario || 0, form['tipo de cambio']) }}</td>
+                                <td class="py-2 px-3 text-right font-black text-[11px] text-slate-800 bg-slate-50">{{ formatCurrency((item.cantidad || 0) * (item.unitario || 0), form['tipo de cambio']) }}</td>
                             </tr>
-                            <tr class="text-[10px]">
-                                <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
-                                <td class="py-1 px-3 text-right font-bold text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate * 0.19, 'CLP') }}</td>
-                            </tr>
-                            <tr class="bg-slate-100 font-black text-[11px]">
-                                <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL CLP:</td>
-                                <td class="py-2 px-3 text-right text-primary-800">{{ formatCurrency(subtotalNeto * currentRate * 1.19, 'CLP') }}</td>
-                            </tr>
-                        </template>
-                        <!-- SOLO CLP -->
-                        <template v-else>
-                            <tr class="text-[11px]">
-                                <td class="py-1.5 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
-                                <td class="py-1.5 px-3 text-right font-black text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * 0.19, 'CLP') }}</td>
-                            </tr>
-                            <tr class="bg-slate-100 font-black text-[13px]">
-                                <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL FINAL:</td>
-                                <td class="py-2 px-3 text-right text-primary-800">CLP {{ formatCurrency(subtotalNeto * 1.19, 'CLP') }}</td>
-                            </tr>
-                        </template>
+                        </tbody>
                     </table>
+
+                    <!-- TOTALS -->
+                    <div class="flex justify-end mb-6 mt-4">
+                        <div class="w-72 border-b-2 border-x-2 border-slate-800 bg-white">
+                            <table class="w-full text-xs">
+                                <tr class="bg-slate-50">
+                                    <td class="py-3 px-3 font-black text-slate-800 text-right uppercase border-r border-slate-200">TOTAL {{ form['tipo de cambio'] }} NETO:</td>
+                                    <td class="py-3 px-3 text-right font-black text-primary-700 text-[16px] leading-none">{{ formatCurrency(subtotalNeto, form['tipo de cambio']) }}</td>
+                                </tr>
+                                <!-- SUB-CALCULO EN CLP SI ES MONEDA EXTRANJERA -->
+                                <template v-if="form['tipo de cambio'] !== 'CLP'">
+                                    <tr class="bg-slate-200 text-[9px]">
+                                        <td colspan="2" class="py-1 px-3 text-center border-t border-slate-800 font-bold text-slate-600">(TC: ${{ formatCurrency(currentRate, 'USD') }})</td>
+                                    </tr>
+                                    <tr class="text-[10px]">
+                                        <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">TOTAL NETO CLP:</td>
+                                        <td class="py-1 px-3 text-right font-bold text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate, 'CLP') }}</td>
+                                    </tr>
+                                    <tr class="text-[10px]">
+                                        <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
+                                        <td class="py-1 px-3 text-right font-bold text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate * 0.19, 'CLP') }}</td>
+                                    </tr>
+                                    <tr class="bg-slate-100 font-black text-[11px]">
+                                        <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL CLP:</td>
+                                        <td class="py-2 px-3 text-right text-primary-800">{{ formatCurrency(subtotalNeto * currentRate * 1.19, 'CLP') }}</td>
+                                    </tr>
+                                </template>
+                                <!-- SOLO CLP -->
+                                <template v-else>
+                                    <tr class="text-[11px]">
+                                        <td class="py-1.5 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
+                                        <td class="py-1.5 px-3 text-right font-black text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * 0.19, 'CLP') }}</td>
+                                    </tr>
+                                    <tr class="bg-slate-100 font-black text-[13px]">
+                                        <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL FINAL:</td>
+                                        <td class="py-2 px-3 text-right text-primary-800">CLP {{ formatCurrency(subtotalNeto * 1.19, 'CLP') }}</td>
+                                    </tr>
+                                </template>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- WRAPPER ANCHORED TO BOTTOM -->
+                    <div class="pdf-footer w-full flex flex-col border-2 border-slate-800 bg-white">
+                        <div class="p-3 border-b-2 border-slate-800 bg-slate-50/50 text-[10px] font-mono leading-tight">
+                            <span class="font-bold text-slate-800 text-[11px] block mb-1 uppercase tracking-wide">DATOS DE FACTURACIÓN:</span>
+                            <div class="whitespace-pre-wrap text-slate-800 font-bold uppercase">{{ form['DATOS DE FACTURACIÓN:'] }}</div>
+                        </div>
+
+                        <div class="p-3 bg-yellow-50/10 text-[10px] font-mono leading-tight">
+                            <span class="font-bold text-slate-800 text-[11px] block mb-1 uppercase tracking-wide">OBSERVACIONES:</span>
+                            <div class="whitespace-pre-wrap text-slate-700 uppercase font-semibold">{{ form.obsercaviones }}</div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-
-            <!-- WRAPPER ANCHORED TO BOTTOM -->
-            <div class="pdf-footer w-full flex flex-col border-2 border-slate-800 bg-white">
-                <div class="p-3 border-b-2 border-slate-800 bg-slate-50/50 text-[10px] font-mono leading-tight">
-                    <span class="font-bold text-slate-800 text-[11px] block mb-1 uppercase tracking-wide">DATOS DE FACTURACIÓN:</span>
-                    <div class="whitespace-pre-wrap text-slate-800 font-bold uppercase">{{ form['DATOS DE FACTURACIÓN:'] }}</div>
-                </div>
-
-                <div class="p-3 bg-yellow-50/10 text-[10px] font-mono leading-tight">
-                    <span class="font-bold text-slate-800 text-[11px] block mb-1 uppercase tracking-wide">OBSERVACIONES:</span>
-                    <div class="whitespace-pre-wrap text-slate-700 uppercase font-semibold">{{ form.obsercaviones }}</div>
-                </div>
-            </div>
-
         </div>
     </div>
 </div>
@@ -284,7 +316,6 @@
         setup() {
             const scriptUrl = typeof env !== 'undefined' ? env.SCRIPT_URL : "https://script.google.com/macros/s/AKfycbwFmWCcuqaa09UEBbezoHY_7XR3VKphwivP1qPeoi14YZTLl2JZrxgnU5j5p1f18-8L/exec";
             const records = ref([]);
-            const filteredRecords = ref([]);
             const loading = ref(false);
             const saving = ref(false);
             
@@ -299,8 +330,8 @@
             const addItem = () => items.value.push({ detalle: '', cantidad: 1, unitario: 0 });
             const removeItem = (idx) => { if (items.value.length > 1) items.value.splice(idx, 1); };
 
-            const defaultFact = "NOMBRE: MOVYON SPA AGENCIA EN CHILE SPA\nRUT: 76.416.097-5\nDIRECCION: A.BARROS ERRAZURIZ N°1954 OFICINA 1109 COMUNA PROVIDENCIA, CIUDAD SANTIAGO.\nCONTACTO: FELIPE.EDWARDS@MOVYON.COM | GIOVANNI.DORE@MOVYON.COM".toUpperCase();
-            const defaultObs = "Indirizzo di spedizione: Street: Av el ventisquero 1204\nOffice: bodega 41\nDistrict: Renca |City: Santiago".toUpperCase();
+            const defaultFact = "NOMBRE: MOVYON SPA AGENCIA EN CHILE SPA\nRUT: 76.416.097-5\nDIRECCION: A.BARROS ERRAZURIZ N°1954 OFICINA 1109 COMUNA PROVIDENCIA, CIUDAD SANTIAGO.\nCONTACTO: FELIPE.EDWARDS@MOVYON.COM ; GIOVANNI.DORE@MOVYON.COM".toUpperCase();
+            const defaultObs = "Indirizzo di spedizione: Street: Av el ventisquero 1204\nOffice: bodega 41\nDistrict: Renca \mCity: Santiago".toUpperCase();
 
             const getDefaultForm = () => ({
                 "Correlativo": "",
@@ -380,6 +411,18 @@
                 return `${maxNum + 1}`;
             };
 
+            // NUEVA LÓGICA: Validar si el folio excede lo permitido
+            const maxAllowedValue = computed(() => calculateMaxCorrelativo(records.value));
+            
+            const folioError = computed(() => {
+                if (!form.Correlativo) return false;
+                const currentFolioStr = String(form.Correlativo).match(/\d+/);
+                if (!currentFolioStr) return false;
+                const currentFolioNum = parseInt(currentFolioStr[0], 10);
+                const maxAllowedNum = parseInt(maxAllowedValue.value, 10);
+                return currentFolioNum > maxAllowedNum;
+            });
+
             const applyLatestDefaults = () => {
                 const latestRecord = getLatestRecord(records.value);
                 if(latestRecord) {
@@ -397,7 +440,6 @@
                 showStatus('FORMULARIO REINICIALIZADO', false);
             };
 
-            // NUEVA FUNCIÓN PARA EXTRAER INDICADORES REALES DE CHILE
             const fetchRealExchangeRates = async () => {
                 try {
                     const req = await fetch('https://mindicador.cl/api');
@@ -407,8 +449,6 @@
                         exchangeRates.dolar = data.dolar.valor;
                         exchangeRates.euro = data.euro.valor;
                         exchangeRates.uf = data.uf.valor;
-                        
-                        // Si por algún motivo ya había una moneda extranjera elegida, actualiza el input
                         updateCurrentRate();
                     }
                 } catch(e) {
@@ -424,13 +464,10 @@
                     const jsonPayload = await req.json();
                     
                     let data = [];
-                    // Validar si el script en la nube sigue siendo la versión antigua (Array puro)
                     if (Array.isArray(jsonPayload)) {
                         data = jsonPayload;
                     } else {
                         data = jsonPayload.records || [];
-                        
-                        // Sólo usamos los rates de Google si falló mindicador.cl (Fallback)
                         if(jsonPayload.rates && exchangeRates.dolar === 0) {
                             exchangeRates.dolar = jsonPayload.rates.usd || exchangeRates.dolar;
                             exchangeRates.euro = jsonPayload.rates.eur || exchangeRates.euro;
@@ -440,7 +477,7 @@
                     }
 
                     records.value = data;
-                    if(!selectedRecordId.value && !form.proveedor) {
+                    if(!form.proveedor && !isLocked.value) {
                         form.Correlativo = calculateMaxCorrelativo(data);
                         applyLatestDefaults();
                     }
@@ -454,7 +491,6 @@
             watch(() => form.Correlativo, (newV) => {
                 if(loading.value || !newV) return;
                 
-                // Si el usuario elige desde la lista autocompletada
                 if(String(newV).includes(' - ')) {
                     const matchArr = String(newV).match(/\d+/);
                     if(matchArr) {
@@ -469,7 +505,6 @@
                         }
                     }
                 } else if(!isLocked.value) {
-                    // Carga exacta digitada manualmente (si existe y no es el nuevo correlativo)
                     const numOnly = String(newV).match(/\d+/)?.[0];
                     if(numOnly) {
                         const exactMatch = records.value.find(r => String(r.Correlativo).match(/\d+/)?.[0] === numOnly);
@@ -511,6 +546,13 @@
 
             const saveData = async (withPdf = false) => {
                 if(!form.Correlativo) { showStatus('FALTA CORRELATIVO', true); return; }
+                
+                // Validación Final de Respaldo contra manipulación
+                if (folioError.value) {
+                    showStatus(`EL FOLIO NO PUEDE SER MAYOR A ${maxAllowedValue.value}`, true);
+                    return;
+                }
+
                 form.Correlativo = cleanFormatNum(form.Correlativo);
                 const packItemsToForm = () => {
                     form.detalle = items.value.map(i=>String(i.detalle||'').toUpperCase()).join('\n');
@@ -556,9 +598,7 @@
             const showStatus = (msg, isErr) => { statusMsg.value = msg; statusIsError.value = isErr; };
 
             onMounted(() => {
-                // Al montar la app, primero llamamos a la API pública para traer las divisas
                 fetchRealExchangeRates();
-                // Luego cargamos los datos históricos de Google Sheets
                 loadData();
             });
 
@@ -566,7 +606,7 @@
                 records, loading, saving, form, formatCurrency, cleanFormatNum,
                 items, addItem, removeItem, isLocked, correlativosList, exchangeRates, currentRate,
                 loadData, handleAction, resetToNew, saveData, generatePDF, statusMsg, statusIsError,
-                subtotalNeto, uniqueProviders
+                subtotalNeto, uniqueProviders, folioError, maxAllowedValue, calculateMaxCorrelativo
             };
         }
     }).mount('#app');

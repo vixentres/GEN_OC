@@ -49,14 +49,19 @@
     
     <!-- LEFT PANEL: CONTROLS & FORM -->
     <div class="w-[45%] bg-white border-r shadow-lg z-10 flex flex-col">
-        <div class="p-4 border-b bg-slate-50 flex items-center justify-between">
+        <div class="p-4 border-b bg-slate-50 flex items-center justify-between relative shadow-inner">
             <div>
                 <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2 text-primary-700">
                     GESTOR ÓRDENES DE COMPRA
                 </h1>
+                <div class="flex gap-3 mt-1 text-[9px] font-bold text-slate-500">
+                    <span>USD: ${{ exchangeRates.dolar ? formatCurrency(exchangeRates.dolar, 'USD') : '...' }}</span>
+                    <span>EUR: ${{ exchangeRates.euro ? formatCurrency(exchangeRates.euro, 'USD') : '...' }}</span>
+                    <span>UF: ${{ exchangeRates.uf ? formatCurrency(exchangeRates.uf, 'USD') : '...' }}</span>
+                </div>
             </div>
             
-            <div class="flex gap-2">
+            <div class="flex gap-2 relative z-10">
                 <button @click="resetToNew" class="px-3 py-1.5 bg-primary-600 text-white font-bold rounded shadow-sm hover:bg-primary-700 text-xs flex items-center transition" title="Crear OC desde cero">
                     CREAR NUEVO
                 </button>
@@ -67,55 +72,34 @@
             </div>
         </div>
 
-        <div class="p-4 border-b bg-slate-100 flex flex-col shadow-inner relative">
-            <div class="flex justify-between items-center mb-2">
-                <label class="text-xs font-bold text-slate-600 uppercase tracking-widest">BUSCADOR Y REGISTROS HISTÓRICOS</label>
-                <!-- Exchange rates info -->
-                <div class="flex gap-3 text-[9px] font-bold text-slate-500 bg-white/50 px-2 py-0.5 rounded border border-slate-200">
-                    <span>USD: ${{ exchangeRates.dolar || '...' }}</span>
-                    <span>EUR: ${{ exchangeRates.euro || '...' }}</span>
-                    <span>UF: ${{ exchangeRates.uf || '...' }}</span>
-                </div>
-            </div>
-            <div class="relative">
-                <input type="text" v-model="searchQuery" placeholder="BUSCAR POR CORRELATIVO O PROVEEDOR..." class="w-full px-3 py-2 text-sm border border-slate-300 rounded outline-none focus:ring-2 focus:ring-primary-400 bg-white shadow-sm font-medium uppercase">
-            </div>
-            
-            <div v-show="searchQuery.trim() !== '' && filteredRecords.length > 0" class="mt-2 bg-white border border-slate-300 rounded overflow-hidden shadow-sm">
-                <select v-model="selectedRecordId" size="4" class="w-full text-sm p-1 outline-none text-slate-700 bg-transparent uppercase">
-                    <option v-for="r in filteredRecords" :key="r.Correlativo" :value="r.Correlativo" class="py-1 px-2 border-b border-slate-50 cursor-pointer hover:bg-indigo-50">
-                        {{ cleanFormatNum(r.Correlativo) }} — {{ r.proveedor }}
-                    </option>
-                </select>
-            </div>
-            <div v-if="searchQuery.trim() !== '' && filteredRecords.length === 0" class="mt-1 text-xs text-slate-400 px-2 italic">NINGÚN RESULTADO COINCIDE CON LA CONSULTA.</div>
-
-            <div v-if="selectedRecordId && searchQuery.trim() !== ''" class="flex gap-2 mt-3">
-                <button @click="handleAction('copy')" class="flex-1 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-xs font-black shadow-[0_2px_4px_rgba(0,0,0,0.05)] hover:bg-indigo-100 transition hover:-translate-y-px uppercase">COPIAR (NUEVO CORRELATIVO)</button>
-                <button @click="handleAction('edit')" class="flex-1 py-2 bg-slate-200 border border-slate-300 text-slate-700 rounded text-xs font-black shadow-[0_2px_4px_rgba(0,0,0,0.05)] hover:bg-slate-300 transition hover:-translate-y-px uppercase">EDITAR REGISTRO ACTUAL</button>
-            </div>
-        </div>
-
         <div class="flex-1 overflow-y-auto p-6 space-y-6 scoll-area text-sm bg-white border-b">
             
             <!-- FORM -->
             <div class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Nº Correlativo</label>
-                        <input type="text" v-model="form.Correlativo" class="w-full px-3 py-2 border rounded bg-yellow-50 focus:ring-2 focus:ring-yellow-400 outline-none font-bold text-slate-800 uppercase" placeholder="EJ: 219" title="Ingresar número correlativo">
+                        <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Nº Correlativo / Histórico</label>
+                        <input type="text" v-model="form.Correlativo" list="correlativos-list" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-2 outline-none font-bold text-slate-800 uppercase" :class="isLocked ? 'bg-slate-200 cursor-not-allowed border-slate-300' : 'bg-yellow-50 focus:ring-yellow-400 border-slate-200'" placeholder="BUSCAR O CREAR..." autocomplete="off">
+                        <datalist id="correlativos-list">
+                            <option v-for="r in correlativosList" :value="r"></option>
+                        </datalist>
+                        
+                        <div v-if="isLocked" class="flex gap-2 mt-2">
+                            <button @click="handleAction('copy')" class="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded text-[10px] font-black shadow-sm uppercase transition">COPIAR NUEVO</button>
+                            <button @click="handleAction('edit')" class="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 border border-slate-300 text-slate-700 rounded text-[10px] font-black shadow-sm uppercase transition">MODIFICAR</button>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Moneda (Tipo Cambio)</label>
                         <div class="flex gap-2">
-                             <select v-model="form['tipo de cambio']" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm uppercase">
+                             <select v-model="form['tipo de cambio']" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm uppercase disabled:bg-slate-100 disabled:text-slate-400">
                                 <option value="CLP">CLP</option>
                                 <option value="UF">UF</option>
                                 <option value="USD">USD</option>
                                 <option value="EUR">EUR</option>
                             </select>
                             <div v-if="form['tipo de cambio'] !== 'CLP'" class="w-1/2">
-                                <input type="number" step="0.01" v-model.number="currentRate" class="w-full px-3 py-2 border rounded bg-slate-100 text-center font-bold text-slate-700 outline-none" title="Tasa de cambio personalizada">
+                                <input type="number" step="0.01" v-model.number="currentRate" :disabled="isLocked" class="w-full px-3 py-2 border rounded text-center font-bold outline-none disabled:text-slate-400" :class="isLocked ? 'bg-slate-200 border-slate-300' : 'bg-slate-100 text-slate-700'">
                             </div>
                         </div>
                     </div>
@@ -123,17 +107,17 @@
 
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1 uppercase text-slate-600">PROVEEDOR / COMPAÑÍA</label>
-                    <input type="text" v-model="form.proveedor" list="providers-list" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm text-base uppercase">
+                    <input type="text" v-model="form.proveedor" list="providers-list" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none font-semibold shadow-sm text-base uppercase disabled:bg-slate-100 disabled:text-slate-400">
                     <datalist id="providers-list">
                         <option v-for="prov in uniqueProviders" :value="prov"></option>
                     </datalist>
                 </div>
 
                 <!-- ITEMS LIST -->
-                <div class="border border-slate-200 rounded overflow-hidden my-4 shadow-sm relative">
+                <div class="border border-slate-200 rounded overflow-hidden my-4 shadow-sm relative" :class="isLocked ? 'opacity-70 pointer-events-none' : ''">
                     <div class="flex justify-between items-center bg-slate-800 px-3 py-2 border-b text-white">
                         <label class="block text-[11px] font-black uppercase tracking-wider">DETALLE DEL REQUERIMIENTO</label>
-                        <button @click="addItem" class="px-2 py-1 bg-green-500 text-white rounded text-[10px] font-bold hover:bg-green-600 transition shadow-sm uppercase">AGREGAR LÍNEA</button>
+                        <button @click="addItem" :disabled="isLocked" class="px-2 py-1 bg-green-500 text-white rounded text-[10px] font-bold hover:bg-green-600 transition shadow-sm uppercase">AGREGAR LÍNEA</button>
                     </div>
                     
                     <div class="p-2 bg-slate-50 space-y-2">
@@ -141,15 +125,15 @@
                             
                             <div class="w-4 text-center text-[9px] font-black text-slate-400 bg-slate-200 rounded-full h-4 leading-4">{{idx + 1}}</div>
                             
-                            <input type="text" v-model="item.detalle" placeholder="DESCRIPCIÓN..." class="flex-1 w-1/2 px-2 py-1.5 text-xs border rounded outline-none focus:ring-1 focus:ring-primary-500 bg-white font-medium uppercase">
+                            <input type="text" v-model="item.detalle" placeholder="DESCRIPCIÓN..." :disabled="isLocked" class="flex-1 w-1/2 px-2 py-1.5 text-xs border rounded outline-none focus:ring-1 focus:ring-primary-500 bg-white font-medium uppercase disabled:bg-transparent">
                             <div class="flex gap-1 items-center w-48">
                                 <span class="text-[9px] text-slate-400 font-bold uppercase">CANT:</span>
-                                <input type="number" step="1" v-model.number="item.cantidad" class="w-12 px-1 py-1 text-center text-xs border rounded outline-none bg-white">
+                                <input type="number" step="1" v-model.number="item.cantidad" :disabled="isLocked" class="w-12 px-1 py-1 text-center text-xs border rounded outline-none bg-white disabled:bg-transparent">
                                 <span class="text-[9px] text-slate-400 font-bold uppercase ml-1">P.U:</span>
-                                <input type="number" step="1" v-model.number="item.unitario" class="w-full px-1 py-1 text-right text-xs border rounded outline-none bg-white font-medium">
+                                <input type="number" step="1" v-model.number="item.unitario" :disabled="isLocked" class="w-full px-1 py-1 text-right text-xs border rounded outline-none bg-white font-medium disabled:bg-transparent">
                             </div>
 
-                            <button @click="removeItem(idx)" v-if="items.length > 1" class="w-6 h-6 flex justify-center items-center text-red-500 bg-red-50 rounded hover:bg-red-500 hover:text-white transition" title="Remover">-</button>
+                            <button @click="removeItem(idx)" v-if="items.length > 1 && !isLocked" class="w-6 h-6 flex justify-center items-center text-red-500 bg-red-50 rounded hover:bg-red-500 hover:text-white transition" title="Remover">-</button>
                             <div v-else class="w-6 h-6"></div> 
                         </div>
                     </div>
@@ -157,12 +141,12 @@
 
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">DATOS DE FACTURACIÓN</label>
-                    <textarea v-model="form['DATOS DE FACTURACIÓN:']" rows="4" class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono bg-slate-50 leading-tight text-slate-700 uppercase"></textarea>
+                    <textarea v-model="form['DATOS DE FACTURACIÓN:']" rows="4" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono leading-tight text-slate-700 uppercase disabled:bg-slate-100 disabled:text-slate-500" :class="isLocked ? 'bg-slate-100' : 'bg-slate-50'"></textarea>
                 </div>
 
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider text-primary-700">OBSERVACIONES</label>
-                    <textarea v-model="form.obsercaviones" rows="3" class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono bg-slate-50 leading-tight text-slate-700 uppercase"></textarea>
+                    <textarea v-model="form.obsercaviones" rows="3" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono leading-tight text-slate-700 uppercase disabled:bg-slate-100 disabled:text-slate-500" :class="isLocked ? 'bg-slate-100' : 'bg-slate-50'"></textarea>
                 </div>
 
             </div>
@@ -171,13 +155,18 @@
 
         <!-- ACTIONS -->
         <div class="p-4 bg-slate-100 border-t shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] flex flex-col gap-3 z-10">
-            <button @click="saveData(false)" :disabled="saving" class="w-full py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[14px] transform hover:-translate-y-px uppercase">
-                <span v-if="saving">PROCESANDO...</span>
-                <span v-else>GUARDAR REGISTRO SOLO BD</span>
-            </button>
-            <button @click="saveData(true)" :disabled="saving" class="w-full py-3 bg-primary-700 hover:bg-primary-800 border border-primary-900 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[15px] transform hover:-translate-y-px uppercase">
-                 GUARDAR Y DESCARGAR PDF
-            </button>
+            <template v-if="!isLocked">
+                <button @click="saveData(false)" :disabled="saving" class="w-full py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[14px] transform hover:-translate-y-px uppercase">
+                    <span v-if="saving">PROCESANDO...</span>
+                    <span v-else>GUARDAR REGISTRO SOLO BD</span>
+                </button>
+                <button @click="saveData(true)" :disabled="saving" class="w-full py-3 bg-primary-700 hover:bg-primary-800 border border-primary-900 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[15px] transform hover:-translate-y-px uppercase">
+                     GUARDAR Y DESCARGAR PDF
+                </button>
+            </template>
+            <template v-else>
+                <p class="text-xs text-center font-bold text-indigo-600 bg-indigo-50 py-2 rounded">SELECCIONA "COPIAR" O "MODIFICAR" (ARRIBA) PARA HABILITAR EL GUARDADO.</p>
+            </template>
             <p v-if="statusMsg" class="text-center text-xs font-bold w-full uppercase" :class="statusIsError ? 'text-red-600' : 'text-slate-600'">{{ statusMsg }}</p>
         </div>
     </div>
@@ -193,7 +182,7 @@
             <div class="flex justify-between items-end border-b-2 border-slate-800 pb-3 mb-6">
                 <div>
                     <!-- Logo -->
-                    <img src="https://my.ibtta.org/Portals/0/assets/images/account/Member-Logos/MOVYON_Logo.png" alt="MOVYON" class="h-[75px] object-contain">
+                    <img src="https://raw.githubusercontent.com/vixentres/GEN_OC/main/MOVYON_Logo.png" alt="MOVYON" class="h-[75px] object-contain">
                 </div>
                 <div class="text-right">
                     <h2 class="text-3xl font-black text-slate-800 tracking-tight uppercase leading-none">ORDEN DE COMPRA</h2>
@@ -241,7 +230,7 @@
                         <!-- SUB-CALCULO EN CLP SI ES MONEDA EXTRANJERA -->
                         <template v-if="form['tipo de cambio'] !== 'CLP'">
                             <tr class="bg-slate-200 text-[9px]">
-                                <td colspan="2" class="py-1 px-3 text-center border-t border-slate-800 font-bold text-slate-600">(TC: ${{ formatCurrency(currentRate) }})</td>
+                                <td colspan="2" class="py-1 px-3 text-center border-t border-slate-800 font-bold text-slate-600">(TC: ${{ formatCurrency(currentRate, 'USD') }})</td>
                             </tr>
                             <tr class="text-[10px]">
                                 <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">TOTAL NETO CLP:</td>
@@ -299,8 +288,7 @@
             const loading = ref(false);
             const saving = ref(false);
             
-            const searchQuery = ref('');
-            const selectedRecordId = ref('');
+            const isLocked = ref(false);
             const statusMsg = ref('');
             const statusIsError = ref(false);
 
@@ -337,12 +325,18 @@
                 return [...new Set(provs)].sort();
             });
 
+            const correlativosList = computed(() => {
+                return records.value
+                    .filter(r => r.Correlativo)
+                    .sort((a,b) => parseInt(String(b.Correlativo).match(/\d+/)||'0', 10) - parseInt(String(a.Correlativo).match(/\d+/)||'0', 10))
+                    .map(r => `N° ${String(r.Correlativo).match(/\d+/)?.[0]||'XXX'} - ${r.proveedor || 'SIN PROVEEDOR'}`);
+            });
+
             const formatCurrency = (val, currency = 'CLP') => {
-                if(!val && val !== 0) return '0';
-                const decimals = (currency === 'CLP') ? 0 : 2;
+                if(!val && val !== 0) return '0.00';
                 return Number(val).toLocaleString('es-CL', {
-                    minimumFractionDigits: decimals,
-                    maximumFractionDigits: decimals
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
                 });
             };
 
@@ -395,13 +389,31 @@
             };
 
             const resetToNew = () => {
-                searchQuery.value = '';
-                selectedRecordId.value = '';
+                isLocked.value = false;
                 Object.assign(form, getDefaultForm());
                 form.Correlativo = calculateMaxCorrelativo(records.value);
                 applyLatestDefaults();
                 items.value = [{ detalle: '', cantidad: 1, unitario: 0 }];
                 showStatus('FORMULARIO REINICIALIZADO', false);
+            };
+
+            // NUEVA FUNCIÓN PARA EXTRAER INDICADORES REALES DE CHILE
+            const fetchRealExchangeRates = async () => {
+                try {
+                    const req = await fetch('https://mindicador.cl/api');
+                    const data = await req.json();
+                    
+                    if(data) {
+                        exchangeRates.dolar = data.dolar.valor;
+                        exchangeRates.euro = data.euro.valor;
+                        exchangeRates.uf = data.uf.valor;
+                        
+                        // Si por algún motivo ya había una moneda extranjera elegida, actualiza el input
+                        updateCurrentRate();
+                    }
+                } catch(e) {
+                    console.error("Error obteniendo indicadores de mindicador.cl:", e);
+                }
             };
 
             const loadData = async () => {
@@ -416,9 +428,10 @@
                     if (Array.isArray(jsonPayload)) {
                         data = jsonPayload;
                     } else {
-                        // Nuevo formato desde Apps Script
                         data = jsonPayload.records || [];
-                        if(jsonPayload.rates) {
+                        
+                        // Sólo usamos los rates de Google si falló mindicador.cl (Fallback)
+                        if(jsonPayload.rates && exchangeRates.dolar === 0) {
                             exchangeRates.dolar = jsonPayload.rates.usd || exchangeRates.dolar;
                             exchangeRates.euro = jsonPayload.rates.eur || exchangeRates.euro;
                             exchangeRates.uf = jsonPayload.rates.uf || exchangeRates.uf;
@@ -439,20 +452,34 @@
             };
 
             watch(() => form.Correlativo, (newV) => {
-                const q = cleanFormatNum(newV);
-                if(!q || loading.value) return;
-                const match = records.value.find(r => cleanFormatNum(r.Correlativo) === q);
-                if(match && selectedRecordId.value !== match.Correlativo) {
-                    searchQuery.value = match.Correlativo;
-                    selectedRecordId.value = match.Correlativo;
-                }
-            });
-
-            watch(selectedRecordId, (newId) => {
-                const rec = records.value.find(r => r.Correlativo == newId);
-                if(rec) {
-                    Object.keys(form).forEach(k => { if(rec[k] !== undefined) form[k] = rec[k]; });
-                    parseDbItems(rec);
+                if(loading.value || !newV) return;
+                
+                // Si el usuario elige desde la lista autocompletada
+                if(String(newV).includes(' - ')) {
+                    const matchArr = String(newV).match(/\d+/);
+                    if(matchArr) {
+                        const extractedNum = matchArr[0];
+                        const match = records.value.find(r => String(r.Correlativo).match(/\d+/)?.[0] === extractedNum);
+                        
+                        if(match) {
+                            Object.keys(form).forEach(k => { if(match[k] !== undefined) form[k] = match[k]; });
+                            parseDbItems(match);
+                            form.Correlativo = extractedNum;
+                            isLocked.value = true;
+                        }
+                    }
+                } else if(!isLocked.value) {
+                    // Carga exacta digitada manualmente (si existe y no es el nuevo correlativo)
+                    const numOnly = String(newV).match(/\d+/)?.[0];
+                    if(numOnly) {
+                        const exactMatch = records.value.find(r => String(r.Correlativo).match(/\d+/)?.[0] === numOnly);
+                        const maxId = calculateMaxCorrelativo(records.value);
+                        if(exactMatch && numOnly !== maxId) {
+                            Object.keys(form).forEach(k => { if(exactMatch[k] !== undefined) form[k] = exactMatch[k]; });
+                            parseDbItems(exactMatch);
+                            isLocked.value = true;
+                        }
+                    }
                 }
             });
 
@@ -466,12 +493,12 @@
                     for(let i=0; i<maxLen; i++) {
                         newItems.push({
                             detalle: String(detArr[i] || '').toUpperCase(),
-                            cantidad: parseInt(cantArr[i] || 1),
-                            unitario: parseInt(unitArr[i] || 0)
+                            cantidad: parseFloat(cantArr[i] || 1),
+                            unitario: parseFloat(unitArr[i] || 0)
                         });
                     }
                     items.value = newItems;
-                } catch(e) { items.value = [{ detalle: String(record.detalle||'').toUpperCase(), cantidad: parseInt(record.cantidad)||1, unitario: parseInt(record.unitario)||0 }]; }
+                } catch(e) { items.value = [{ detalle: String(record.detalle||'').toUpperCase(), cantidad: parseFloat(record.cantidad)||1, unitario: parseFloat(record.unitario)||0 }]; }
             };
 
             const handleAction = (mode) => {
@@ -479,8 +506,7 @@
                     form.Correlativo = calculateMaxCorrelativo(records.value);
                     applyLatestDefaults();
                 }
-                searchQuery.value = '';
-                selectedRecordId.value = '';
+                isLocked.value = false;
             };
 
             const saveData = async (withPdf = false) => {
@@ -496,6 +522,8 @@
                     form.unitario = items.value.map(i=>i.unitario).join('\n');
                 };
                 packItemsToForm();
+                if(withPdf) generatePDF();
+
                 saving.value = true;
                 try {
                     const req = await fetch(scriptUrl, {
@@ -507,7 +535,6 @@
                     if(res.status === 'success') {
                         showStatus(res.updated ? 'REGISTRO ACTUALIZADO' : 'NUEVO REGISTRO GUARDADO', false);
                         await loadData();
-                        if(withPdf) generatePDF();
                     }
                 } catch(e) { showStatus('ERROR DE TRANSMISIÓN', true); }
                 saving.value = false;
@@ -520,7 +547,7 @@
                     margin: 0,
                     filename: `OC ${cleanFormatNum(form.Correlativo)} ${(form.proveedor||'').toUpperCase()}.pdf`,
                     image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2 },
+                    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
                     jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' }
                 };
                 html2pdf().set(opt).from(element).save();
@@ -529,12 +556,15 @@
             const showStatus = (msg, isErr) => { statusMsg.value = msg; statusIsError.value = isErr; };
 
             onMounted(() => {
+                // Al montar la app, primero llamamos a la API pública para traer las divisas
+                fetchRealExchangeRates();
+                // Luego cargamos los datos históricos de Google Sheets
                 loadData();
             });
 
             return {
-                records, filteredRecords, loading, saving, form, formatCurrency, cleanFormatNum,
-                items, addItem, removeItem, searchQuery, selectedRecordId, exchangeRates, currentRate,
+                records, loading, saving, form, formatCurrency, cleanFormatNum,
+                items, addItem, removeItem, isLocked, correlativosList, exchangeRates, currentRate,
                 loadData, handleAction, resetToNew, saveData, generatePDF, statusMsg, statusIsError,
                 subtotalNeto, uniqueProviders
             };

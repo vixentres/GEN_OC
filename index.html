@@ -212,9 +212,9 @@
     <div class="w-full lg:w-[55%] flex flex-col items-center py-8 bg-slate-700 shrink-0 lg:shrink lg:h-full lg:overflow-y-auto relative">
         <label class="absolute top-2 left-4 text-[10px] text-slate-300 font-bold uppercase tracking-widest hidden lg:block">VISTA PREVIA DEL DOCUMENTO</label>
         
-        <!-- Envoltorio para Scroll Horizontal del PDF en móviles -->
-        <div class="w-full overflow-x-auto flex lg:justify-center px-4">
-            <div class="min-w-max pb-8"> <!-- Mantiene los márgenes correctos en el scroll horizontal -->
+        <!-- Envoltorio para Escalado del PDF en móviles -->
+        <div class="w-full overflow-hidden flex justify-center px-4 pb-8" ref="previewWrapper">
+            <div :style="previewScaleStyle" class="origin-top transition-transform duration-200">
                 <!-- A4 Container (Fijo en pixeles para perfecta generacion PDF) -->
                 <div id="pdf-preview-container" class="shadow-2xl relative shrink-0">
                     
@@ -320,11 +320,33 @@
 </div>
 
 <script>
-    const { createApp, ref, onMounted, reactive, computed, watch } = Vue;
+    const { createApp, ref, onMounted, onUnmounted, reactive, computed, watch } = Vue;
 
     createApp({
         setup() {
             const scriptUrl = typeof env !== 'undefined' ? env.SCRIPT_URL : "https://script.google.com/macros/s/AKfycbxiPttFUAzBGmMLL2VcQZ_qhjXYVh7owa-vkJbKNpRKCV9sfKzxfB6A9csmlwq6Tpq3/exec";
+            const scaleVal = ref(1);
+            const previewWrapper = ref(null);
+
+            const updateScale = () => {
+                if (previewWrapper.value) {
+                    const parentWidth = previewWrapper.value.clientWidth;
+                    if (parentWidth < 794) {
+                        scaleVal.value = parentWidth / 794;
+                    } else {
+                        scaleVal.value = 1;
+                    }
+                }
+            };
+
+            const previewScaleStyle = computed(() => {
+                return {
+                    transform: `scale(${scaleVal.value})`,
+                    transformOrigin: 'top center',
+                    height: `${1123 * scaleVal.value}px`,
+                    width: '794px'
+                };
+            });
             const records = ref([]);
             const loading = ref(false);
             const saving = ref(false);
@@ -639,6 +661,12 @@
             onMounted(() => {
                 fetchRealExchangeRates();
                 loadData();
+                updateScale();
+                window.addEventListener('resize', updateScale);
+            });
+
+            onUnmounted(() => {
+                window.removeEventListener('resize', updateScale);
             });
 
             return {
@@ -646,7 +674,8 @@
                 items, addItem, removeItem, isLocked, correlativosList, exchangeRates, currentRate,
                 loadData, handleAction, resetToNew, saveData, generatePDF, statusMsg, statusIsError,
                 subtotalNeto, uniqueProviders, folioError, maxAllowedValue, calculateMaxCorrelativo,
-                recordsListSorted, selectedFolioSelect, onFolioSelectChange, billingInfo
+                recordsListSorted, selectedFolioSelect, onFolioSelectChange, billingInfo,
+                scaleVal, previewWrapper, updateScale, previewScaleStyle
             };
         }
     }).mount('#app');

@@ -81,31 +81,41 @@
             
             <div class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Validación del Folio Responsiva -->
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Nº Correlativo / Histórico</label>
-                        <input type="text" v-model="form.Correlativo" list="correlativos-list" :disabled="isLocked" 
-                               class="w-full px-3 py-2 border rounded focus:ring-2 outline-none font-bold text-slate-800 uppercase transition-all" 
-                               :class="[
-                                   isLocked ? 'bg-slate-200 cursor-not-allowed border-slate-300' : 'bg-yellow-50 focus:ring-yellow-400 border-slate-200',
-                                   folioError ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-400 bg-red-50' : ''
-                               ]" 
-                               placeholder="BUSCAR O CREAR..." autocomplete="off">
-                        <datalist id="correlativos-list">
-                            <option v-for="r in correlativosList" :value="r"></option>
-                        </datalist>
-                        
-                        <!-- Mensaje de Error si el folio excede el límite -->
-                        <div v-if="folioError" class="text-[10px] text-red-600 font-bold mt-1 uppercase flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
-                            MÁXIMO PERMITIDO: {{ maxAllowedValue }}
+                    <!-- Selector de Folios Existentes o Crear Nuevo -->
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Cargar / Ver Folio</label>
+                            <select :value="selectedFolioSelect" @change="onFolioSelectChange($event.target.value)" 
+                                    class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none font-bold text-slate-800 uppercase bg-slate-50 transition-all border-slate-200 text-xs">
+                                <option value="new">-- CREAR NUEVO (FOLIO {{ maxAllowedValue }}) --</option>
+                                <option v-for="r in recordsListSorted" :value="String(r.Correlativo).match(/\d+/)?.[0] || r.Correlativo">
+                                    N° {{ cleanFormatNum(r.Correlativo) }} - {{ r.proveedor || 'SIN PROVEEDOR' }}
+                                </option>
+                            </select>
                         </div>
-                        
-                        <div v-if="isLocked" class="flex gap-2 mt-2">
-                            <button @click="handleAction('copy')" class="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded text-[10px] font-black shadow-sm uppercase transition">COPIAR NUEVO</button>
-                            <button @click="handleAction('edit')" class="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 border border-slate-300 text-slate-700 rounded text-[10px] font-black shadow-sm uppercase transition">MODIFICAR</button>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Nº Correlativo Activo</label>
+                            <input type="text" v-model="form.Correlativo" :disabled="isLocked" 
+                                   class="w-full px-3 py-2 border rounded focus:ring-2 outline-none font-bold text-slate-800 uppercase transition-all text-xs" 
+                                   :class="[
+                                       isLocked ? 'bg-slate-200 cursor-not-allowed border-slate-300' : 'bg-yellow-50 focus:ring-yellow-400 border-slate-200',
+                                       folioError ? 'border-red-500 ring-2 ring-red-200 focus:ring-red-400 bg-red-50' : ''
+                                   ]" 
+                                   placeholder="FOLIO..." autocomplete="off">
+                            
+                            <!-- Mensaje de Error si el folio excede el límite -->
+                            <div v-if="folioError" class="text-[10px] text-red-600 font-bold mt-1 uppercase flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                                MÁXIMO PERMITIDO: {{ maxAllowedValue }}
+                            </div>
+                            
+                            <div v-if="isLocked" class="flex gap-2 mt-2">
+                                <button @click="handleAction('copy')" class="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded text-[10px] font-black shadow-sm uppercase transition">COPIAR NUEVO</button>
+                                <button @click="handleAction('edit')" class="flex-1 py-1.5 bg-slate-200 hover:bg-slate-300 border border-slate-300 text-slate-700 rounded text-[10px] font-black shadow-sm uppercase transition">MODIFICAR</button>
+                            </div>
                         </div>
                     </div>
 
@@ -113,14 +123,14 @@
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1 uppercase">Moneda (Tipo Cambio)</label>
                         <div class="flex gap-2">
-                             <select v-model="form['tipo de cambio']" :disabled="isLocked" class="flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm uppercase disabled:bg-slate-100 disabled:text-slate-400">
+                             <select v-model="form['tipo de cambio']" :disabled="isLocked" class="flex-1 px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none text-slate-800 font-semibold shadow-sm uppercase disabled:bg-slate-100 disabled:text-slate-400 text-xs">
                                 <option value="CLP">CLP</option>
                                 <option value="UF">UF</option>
                                 <option value="USD">USD</option>
                                 <option value="EUR">EUR</option>
                             </select>
                             <div v-if="form['tipo de cambio'] !== 'CLP'" class="w-1/2 md:w-2/5">
-                                <input type="number" step="0.01" v-model.number="currentRate" :disabled="isLocked" class="w-full px-3 py-2 border rounded text-center font-bold outline-none disabled:text-slate-400" :class="isLocked ? 'bg-slate-200 border-slate-300' : 'bg-slate-100 text-slate-700'">
+                                <input type="number" step="0.01" v-model.number="currentRate" :disabled="isLocked" class="w-full px-3 py-2 border rounded text-center font-bold outline-none disabled:text-slate-400 text-xs" :class="isLocked ? 'bg-slate-200 border-slate-300' : 'bg-slate-100 text-slate-700'">
                             </div>
                         </div>
                     </div>
@@ -331,7 +341,8 @@
             const removeItem = (idx) => { if (items.value.length > 1) items.value.splice(idx, 1); };
 
             const defaultFact = "NOMBRE: MOVYON SPA AGENCIA EN CHILE SPA\nRUT: 76.416.097-5\nDIRECCION: A.BARROS ERRAZURIZ N°1954 OFICINA 1109 COMUNA PROVIDENCIA, CIUDAD SANTIAGO.\nCONTACTO: FELIPE.EDWARDS@MOVYON.COM ; GIOVANNI.DORE@MOVYON.COM".toUpperCase();
-            const defaultObs = "Indirizzo di spedizione: Street: Av el ventisquero 1204\nOffice: bodega 41\nDistrict: Renca \mCity: Santiago".toUpperCase();
+            const defaultObs = "";
+            const billingInfo = ref('');
 
             const getDefaultForm = () => ({
                 "Correlativo": "",
@@ -362,6 +373,34 @@
                     .sort((a,b) => parseInt(String(b.Correlativo).match(/\d+/)||'0', 10) - parseInt(String(a.Correlativo).match(/\d+/)||'0', 10))
                     .map(r => `N° ${String(r.Correlativo).match(/\d+/)?.[0]||'XXX'} - ${r.proveedor || 'SIN PROVEEDOR'}`);
             });
+
+            const recordsListSorted = computed(() => {
+                return [...records.value]
+                    .filter(r => r.Correlativo)
+                    .sort((a,b) => parseInt(String(b.Correlativo).match(/\d+/)||'0', 10) - parseInt(String(a.Correlativo).match(/\d+/)||'0', 10));
+            });
+
+            const selectedFolioSelect = computed(() => {
+                if (!form.Correlativo || !isLocked.value) return 'new';
+                const currentFolioStr = String(form.Correlativo).match(/\d+/)?.[0];
+                if (!currentFolioStr) return 'new';
+                const exists = records.value.some(r => String(r.Correlativo).match(/\d+/)?.[0] === currentFolioStr);
+                return exists ? currentFolioStr : 'new';
+            });
+
+            const onFolioSelectChange = (val) => {
+                if (val === 'new') {
+                    resetToNew();
+                } else {
+                    const match = records.value.find(r => String(r.Correlativo).match(/\d+/)?.[0] === val);
+                    if (match) {
+                        Object.keys(form).forEach(k => { if(match[k] !== undefined) form[k] = match[k]; });
+                        parseDbItems(match);
+                        form.Correlativo = String(match.Correlativo).match(/\d+/)?.[0] || match.Correlativo;
+                        isLocked.value = true;
+                    }
+                }
+            };
 
             const formatCurrency = (val, currency = 'CLP') => {
                 if(!val && val !== 0) return '0.00';
@@ -424,11 +463,8 @@
             });
 
             const applyLatestDefaults = () => {
-                const latestRecord = getLatestRecord(records.value);
-                if(latestRecord) {
-                    if(latestRecord['DATOS DE FACTURACIÓN:']) form['DATOS DE FACTURACIÓN:'] = String(latestRecord['DATOS DE FACTURACIÓN:']).toUpperCase();
-                    if(latestRecord.obsercaviones) form.obsercaviones = String(latestRecord.obsercaviones).toUpperCase();
-                }
+                form['DATOS DE FACTURACIÓN:'] = (billingInfo.value || defaultFact).toUpperCase();
+                form.obsercaviones = "";
             };
 
             const resetToNew = () => {
@@ -468,6 +504,9 @@
                         data = jsonPayload;
                     } else {
                         data = jsonPayload.records || [];
+                        if (jsonPayload.billingInfo) {
+                            billingInfo.value = jsonPayload.billingInfo;
+                        }
                         if(jsonPayload.rates && exchangeRates.dolar === 0) {
                             exchangeRates.dolar = jsonPayload.rates.usd || exchangeRates.dolar;
                             exchangeRates.euro = jsonPayload.rates.eur || exchangeRates.euro;
@@ -606,7 +645,8 @@
                 records, loading, saving, form, formatCurrency, cleanFormatNum,
                 items, addItem, removeItem, isLocked, correlativosList, exchangeRates, currentRate,
                 loadData, handleAction, resetToNew, saveData, generatePDF, statusMsg, statusIsError,
-                subtotalNeto, uniqueProviders, folioError, maxAllowedValue, calculateMaxCorrelativo
+                subtotalNeto, uniqueProviders, folioError, maxAllowedValue, calculateMaxCorrelativo,
+                recordsListSorted, selectedFolioSelect, onFolioSelectChange, billingInfo
             };
         }
     }).mount('#app');

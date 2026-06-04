@@ -22,8 +22,28 @@ function getExchangeRates() {
   return rates;
 }
 
+function getBillingInfo(spreadsheet) {
+  var configSheet = spreadsheet.getSheetByName("Config");
+  if (!configSheet) {
+    configSheet = spreadsheet.insertSheet("Config");
+    configSheet.getRange(1, 1).setValue("DATOS DE FACTURACIÓN");
+    configSheet.getRange(1, 2).setValue("NOMBRE: MOVYON SPA AGENCIA EN CHILE SPA\nRUT: 76.416.097-5\nDIRECCION: A.BARROS ERRAZURIZ N°1954 OFICINA 1109 COMUNA PROVIDENCIA, CIUDAD SANTIAGO.\nCONTACTO: FELIPE.EDWARDS@MOVYON.COM ; GIOVANNI.DORE@MOVYON.COM");
+  }
+  return configSheet.getRange(1, 2).getValue().toString();
+}
+
+function setBillingInfo(spreadsheet, value) {
+  var configSheet = spreadsheet.getSheetByName("Config");
+  if (!configSheet) {
+    configSheet = spreadsheet.insertSheet("Config");
+    configSheet.getRange(1, 1).setValue("DATOS DE FACTURACIÓN");
+  }
+  configSheet.getRange(1, 2).setValue(value);
+}
+
 function doGet(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = spreadsheet.getActiveSheet();
   var data = sheet.getDataRange().getValues();
   var headers = data[0];
   var result = [];
@@ -38,7 +58,8 @@ function doGet(e) {
   
   var finalResult = {
     records: result,
-    rates: getExchangeRates()
+    rates: getExchangeRates(),
+    billingInfo: getBillingInfo(spreadsheet)
   };
   
   var output = ContentService.createTextOutput(JSON.stringify(finalResult));
@@ -48,7 +69,8 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = spreadsheet.getActiveSheet();
     var data;
     
     // Parse json body. We use text/plain in client to avoid CORS preflight,
@@ -83,6 +105,11 @@ function doPost(e) {
     // If not updated, append new row
     if (!updated) {
       sheet.appendRow(newRow);
+    }
+    
+    // Save billing info to the config sheet as well
+    if (data["DATOS DE FACTURACIÓN:"]) {
+      setBillingInfo(spreadsheet, data["DATOS DE FACTURACIÓN:"]);
     }
     
     var response = { "status": "success", "updated": updated, "correlativo": data["Correlativo"] };

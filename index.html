@@ -202,7 +202,12 @@
                 </button>
             </template>
             <template v-else>
-                <p class="text-xs text-center font-bold text-indigo-600 bg-indigo-50 py-2 rounded">SELECCIONA "COPIAR" O "MODIFICAR" (ARRIBA) PARA HABILITAR EL GUARDADO.</p>
+                <div class="flex flex-col gap-2">
+                    <button @click="generatePDF" class="w-full py-3 bg-green-700 hover:bg-green-800 text-white font-bold rounded shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-[15px] transform hover:-translate-y-px uppercase">
+                         DESCARGAR PDF EXISTENTE
+                    </button>
+                    <p class="text-[10px] text-center font-bold text-indigo-600 bg-indigo-50 py-2 rounded">SELECCIONA "COPIAR" O "MODIFICAR" (ARRIBA) PARA HABILITAR LA EDICIÓN Y GUARDADO EN BD.</p>
+                </div>
             </template>
             <p v-if="statusMsg" class="text-center text-xs font-bold w-full uppercase" :class="statusIsError ? 'text-red-600' : 'text-slate-600'">{{ statusMsg }}</p>
         </div>

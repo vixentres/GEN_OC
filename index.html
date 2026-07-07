@@ -133,35 +133,52 @@
                                 <input type="number" step="0.01" v-model.number="currentRate" :disabled="isLocked" class="w-full px-3 py-2 border rounded text-center font-bold outline-none disabled:text-slate-400 text-xs" :class="isLocked ? 'bg-slate-200 border-slate-300' : 'bg-slate-100 text-slate-700'">
                             </div>
                         </div>
+                        <div v-if="form['tipo de cambio'] !== 'CLP'" class="mt-2 flex items-center gap-2">
+                            <input type="checkbox" id="mantener-moneda" v-model="form.mantenerMoneda" :disabled="isLocked" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-slate-300 rounded cursor-pointer">
+                            <label for="mantener-moneda" class="text-[10px] font-bold text-slate-600 uppercase cursor-pointer select-none">
+                                Calcular IVA y Total en {{ form['tipo de cambio'] }}
+                            </label>
+                        </div>
                     </div>
                 </div>
 
-                <div class="relative">
-                    <label class="block text-xs font-bold text-slate-700 mb-1 uppercase text-slate-600">PROVEEDOR / COMPAÑÍA</label>
-                    <div class="relative flex items-center">
-                        <input type="text" v-model="form.proveedor" :disabled="isLocked"
-                               @focus="showProviderDropdown = true"
-                               @blur="closeProviderDropdownWithDelay"
-                               @input="onProviderInput"
-                               class="w-full px-3 py-2 pr-8 border rounded focus:ring-2 focus:ring-primary-500 outline-none font-semibold shadow-sm text-xs uppercase disabled:bg-slate-100 disabled:text-slate-400 border-slate-200"
-                               placeholder="BUSCAR O ESCRIBIR PROVEEDOR..." autocomplete="off">
-                        <!-- Icono flecha a la derecha para desplegar -->
-                        <button type="button" @click="toggleProviderDropdown" :disabled="isLocked"
-                                class="absolute right-2 text-slate-400 hover:text-slate-600 focus:outline-none disabled:opacity-50">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="showProviderDropdown ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </button>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Proveedor -->
+                    <div class="md:col-span-2 relative">
+                        <label class="block text-xs font-bold text-slate-700 mb-1 uppercase text-slate-600">PROVEEDOR / COMPAÑÍA</label>
+                        <div class="relative flex items-center">
+                            <input type="text" v-model="form.proveedor" :disabled="isLocked"
+                                   @focus="showProviderDropdown = true"
+                                   @blur="closeProviderDropdownWithDelay"
+                                   @input="onProviderInput"
+                                   class="w-full px-3 py-2 pr-8 border rounded focus:ring-2 focus:ring-primary-500 outline-none font-semibold shadow-sm text-xs uppercase disabled:bg-slate-100 disabled:text-slate-400 border-slate-200"
+                                   placeholder="BUSCAR O ESCRIBIR PROVEEDOR..." autocomplete="off">
+                            <!-- Icono flecha a la derecha para desplegar -->
+                            <button type="button" @click="toggleProviderDropdown" :disabled="isLocked"
+                                    class="absolute right-2 text-slate-400 hover:text-slate-600 focus:outline-none disabled:opacity-50">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-200" :class="showProviderDropdown ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Listado flotante de autocompletado -->
+                        <div v-if="showProviderDropdown && filteredProviders.length > 0" 
+                             class="absolute z-30 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded shadow-lg text-xs">
+                            <div v-for="prov in filteredProviders" :key="prov"
+                                 @mousedown="selectProvider(prov)"
+                                 class="px-3 py-2 cursor-pointer hover:bg-primary-50 hover:text-primary-700 font-bold uppercase border-b border-slate-100 last:border-0">
+                                {{ prov }}
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Listado flotante de autocompletado -->
-                    <div v-if="showProviderDropdown && filteredProviders.length > 0" 
-                         class="absolute z-30 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded shadow-lg text-xs">
-                        <div v-for="prov in filteredProviders" :key="prov"
-                             @mousedown="selectProvider(prov)"
-                             class="px-3 py-2 cursor-pointer hover:bg-primary-50 hover:text-primary-700 font-bold uppercase border-b border-slate-100 last:border-0">
-                            {{ prov }}
-                        </div>
+                    <!-- RUT -->
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1 uppercase text-slate-600">RUT PROVEEDOR</label>
+                        <input type="text" v-model="form.RUT" :disabled="isLocked"
+                               class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-primary-500 outline-none font-semibold shadow-sm text-xs uppercase disabled:bg-slate-100 disabled:text-slate-400 border-slate-200"
+                               placeholder="RUT (OPCIONAL)..." autocomplete="off">
                     </div>
                 </div>
 
@@ -199,12 +216,16 @@
 
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">DATOS DE FACTURACIÓN</label>
-                    <textarea v-model="form['DATOS DE FACTURACIÓN:']" rows="4" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono leading-tight text-slate-700 uppercase disabled:bg-slate-100 disabled:text-slate-500" :class="isLocked ? 'bg-slate-100' : 'bg-slate-50'"></textarea>
+                    <textarea ref="factTextarea" v-model="form['DATOS DE FACTURACIÓN:']" rows="1" :disabled="isLocked"
+                              @input="resizeTextareas" @focus="resizeTextareas"
+                              class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono leading-tight text-slate-700 uppercase disabled:bg-slate-100 disabled:text-slate-500 overflow-hidden resize-none" :class="isLocked ? 'bg-slate-100' : 'bg-slate-50'"></textarea>
                 </div>
 
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider text-primary-700">OBSERVACIONES</label>
-                    <textarea v-model="form.obsercaviones" rows="3" :disabled="isLocked" class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono leading-tight text-slate-700 uppercase disabled:bg-slate-100 disabled:text-slate-500" :class="isLocked ? 'bg-slate-100' : 'bg-slate-50'"></textarea>
+                    <textarea ref="obsTextarea" v-model="form.obsercaviones" rows="1" :disabled="isLocked"
+                              @input="resizeTextareas" @focus="resizeTextareas"
+                              class="w-full px-3 py-2 border rounded focus:ring-1 focus:ring-slate-300 outline-none text-[11px] font-mono leading-tight text-slate-700 uppercase disabled:bg-slate-100 disabled:text-slate-500 overflow-hidden resize-none" :class="isLocked ? 'bg-slate-100' : 'bg-slate-50'"></textarea>
                 </div>
 
             </div>
@@ -260,7 +281,9 @@
                     <!-- SUPPLIER -->
                     <div class="mb-6 mx-1 border-l-4 border-primary-600 pl-4 py-1 bg-slate-50">
                         <h3 class="text-[10px] font-bold text-slate-400 tracking-wider mb-1 uppercase">PROVEEDOR</h3>
-                        <p class="text-lg font-black text-slate-800 uppercase leading-none">{{ form.proveedor || '-' }}</p>
+                        <p class="text-lg font-black text-slate-800 uppercase leading-none">
+                            {{ form.proveedor || '-' }}<span v-if="form.RUT"> RUT: {{ form.RUT }}</span>
+                        </p>
                     </div>
 
                     <!-- TABLE -->
@@ -289,37 +312,39 @@
                     <div class="flex justify-end mb-6 mt-4">
                         <div class="w-72 border-b-2 border-x-2 border-slate-800 bg-white">
                             <table class="w-full text-xs">
-                                <tr class="bg-slate-50">
-                                    <td class="py-3 px-3 font-black text-slate-800 text-right uppercase border-r border-slate-200">TOTAL {{ form['tipo de cambio'] }} NETO:</td>
-                                    <td class="py-3 px-3 text-right font-black text-primary-700 text-[16px] leading-none">{{ formatCurrency(subtotalNeto, form['tipo de cambio']) }}</td>
-                                </tr>
-                                <!-- SUB-CALCULO EN CLP SI ES MONEDA EXTRANJERA -->
-                                <template v-if="form['tipo de cambio'] !== 'CLP'">
-                                    <tr class="bg-slate-200 text-[9px]">
-                                        <td colspan="2" class="py-1 px-3 text-center border-t border-slate-800 font-bold text-slate-600">(TC: ${{ formatCurrency(currentRate, 'USD') }})</td>
+                                <!-- En la misma moneda (checkbox marcado o moneda es CLP) -->
+                                <template v-if="form.mantenerMoneda || form['tipo de cambio'] === 'CLP'">
+                                    <tr class="bg-slate-50">
+                                        <td class="py-3 px-3 font-black text-slate-800 text-right uppercase border-r border-slate-200">TOTAL {{ form['tipo de cambio'] }} NETO:</td>
+                                        <td class="py-3 px-3 text-right font-black text-primary-700 text-[16px] leading-none">{{ formatCurrency(subtotalNeto, form['tipo de cambio']) }}</td>
                                     </tr>
-                                    <tr class="text-[10px]">
-                                        <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">TOTAL NETO CLP:</td>
-                                        <td class="py-1 px-3 text-right font-bold text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate, 'CLP') }}</td>
-                                    </tr>
-                                    <tr class="text-[10px]">
-                                        <td class="py-1 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
-                                        <td class="py-1 px-3 text-right font-bold text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate * 0.19, 'CLP') }}</td>
-                                    </tr>
-                                    <tr class="bg-slate-100 font-black text-[11px]">
-                                        <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL CLP:</td>
-                                        <td class="py-2 px-3 text-right text-primary-800">{{ formatCurrency(subtotalNeto * currentRate * 1.19, 'CLP') }}</td>
-                                    </tr>
-                                </template>
-                                <!-- SOLO CLP -->
-                                <template v-else>
                                     <tr class="text-[11px]">
                                         <td class="py-1.5 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
-                                        <td class="py-1.5 px-3 text-right font-black text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * 0.19, 'CLP') }}</td>
+                                        <td class="py-1.5 px-3 text-right font-black text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * 0.19, form['tipo de cambio']) }}</td>
                                     </tr>
                                     <tr class="bg-slate-100 font-black text-[13px]">
                                         <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL FINAL:</td>
-                                        <td class="py-2 px-3 text-right text-primary-800">CLP {{ formatCurrency(subtotalNeto * 1.19, 'CLP') }}</td>
+                                        <td class="py-2 px-3 text-right text-primary-800">{{ form['tipo de cambio'] }} {{ formatCurrency(subtotalNeto * 1.19, form['tipo de cambio']) }}</td>
+                                    </tr>
+                                </template>
+                                <!-- Con conversión a CLP (checkbox desmarcado y moneda no es CLP) -->
+                                <template v-else>
+                                    <tr class="bg-slate-200 text-[9px]">
+                                        <td colspan="2" class="py-2 px-3 text-center border-t border-b border-slate-800 font-bold text-slate-700">
+                                            (TC {{ form['tipo de cambio'] }} aproximado a la fecha de {{ new Date().toLocaleDateString('es-CL') }} : ${{ formatCurrency(currentRate, 'CLP') }})
+                                        </td>
+                                    </tr>
+                                    <tr class="bg-slate-50">
+                                        <td class="py-3 px-3 font-black text-slate-800 text-right uppercase border-r border-slate-200">TOTAL NETO CLP:</td>
+                                        <td class="py-3 px-3 text-right font-black text-primary-700 text-[16px] leading-none">{{ formatCurrency(subtotalNeto * currentRate, 'CLP') }}</td>
+                                    </tr>
+                                    <tr class="text-[11px]">
+                                        <td class="py-1.5 px-3 font-bold text-slate-600 text-right uppercase border-r border-slate-100">IVA (19%):</td>
+                                        <td class="py-1.5 px-3 text-right font-black text-slate-800 border-b border-slate-100">{{ formatCurrency(subtotalNeto * currentRate * 0.19, 'CLP') }}</td>
+                                    </tr>
+                                    <tr class="bg-slate-100 font-black text-[13px]">
+                                        <td class="py-2 px-3 text-slate-800 text-right uppercase border-r border-slate-800">TOTAL FINAL:</td>
+                                        <td class="py-2 px-3 text-right text-primary-800">CLP {{ formatCurrency(subtotalNeto * currentRate * 1.19, 'CLP') }}</td>
                                     </tr>
                                 </template>
                             </table>
@@ -392,19 +417,41 @@
             const defaultObs = "";
             const billingInfo = ref('');
 
+            const obsTextarea = ref(null);
+            const factTextarea = ref(null);
+
+            const resizeTextareas = () => {
+                setTimeout(() => {
+                    if (obsTextarea.value) {
+                        obsTextarea.value.style.height = 'auto';
+                        obsTextarea.value.style.height = obsTextarea.value.scrollHeight + 'px';
+                    }
+                    if (factTextarea.value) {
+                        factTextarea.value.style.height = 'auto';
+                        factTextarea.value.style.height = factTextarea.value.scrollHeight + 'px';
+                    }
+                }, 50);
+            };
+
             const getDefaultForm = () => ({
                 "Correlativo": "",
                 "proveedor": "",
+                "RUT": "",
                 "cantidad": "",
                 "detalle": "",
                 "unitario": "",
                 "tipo de cambio": "CLP",
                 "pie de pagina": "",
                 "obsercaviones": defaultObs,
-                "DATOS DE FACTURACIÓN:": defaultFact
+                "DATOS DE FACTURACIÓN:": defaultFact,
+                "mantenerMoneda": true
             });
 
             const form = reactive(getDefaultForm());
+
+            // Watch observations and billing details to trigger resizing
+            watch(() => form.obsercaviones, resizeTextareas);
+            watch(() => form['DATOS DE FACTURACIÓN:'], resizeTextareas);
 
             const subtotalNeto = computed(() => {
                 return items.value.reduce((sum, i) => sum + ((parseFloat(i.cantidad) || 0) * (parseFloat(i.unitario) || 0)), 0);
@@ -446,11 +493,23 @@
                         parseDbItems(match);
                         form.Correlativo = String(match.Correlativo).match(/\d+/)?.[0] || match.Correlativo;
                         isLocked.value = true;
+                        resizeTextareas();
                     }
                 }
             };
 
             const showProviderDropdown = ref(false);
+
+            const providerRutMap = computed(() => {
+                const map = {};
+                records.value.forEach(r => {
+                    const prov = String(r.proveedor || '').toUpperCase().trim();
+                    if (prov && r.RUT) {
+                        map[prov] = String(r.RUT).toUpperCase().trim();
+                    }
+                });
+                return map;
+            });
 
             const filteredProviders = computed(() => {
                 const search = String(form.proveedor || '').toUpperCase().trim();
@@ -466,6 +525,9 @@
             const selectProvider = (prov) => {
                 form.proveedor = prov;
                 showProviderDropdown.value = false;
+                if (providerRutMap.value[prov]) {
+                    form.RUT = providerRutMap.value[prov];
+                }
             };
 
             const onProviderInput = () => {
@@ -550,6 +612,7 @@
                 applyLatestDefaults();
                 items.value = [{ detalle: '', cantidad: 1, unitario: 0 }];
                 showStatus('FORMULARIO REINICIALIZADO', false);
+                resizeTextareas();
             };
 
             const fetchRealExchangeRates = async () => {
@@ -595,6 +658,7 @@
                     if(!form.proveedor && !isLocked.value) {
                         form.Correlativo = calculateMaxCorrelativo(data);
                         applyLatestDefaults();
+                        resizeTextareas();
                     }
                     showStatus('CONEXIÓN EXITOSA', false);
                 } catch(e) {
@@ -672,6 +736,7 @@
                 const packItemsToForm = () => {
                     form.detalle = items.value.map(i=>String(i.detalle||'').toUpperCase()).join('\n');
                     form.proveedor = String(form.proveedor || '').toUpperCase();
+                    form.RUT = String(form.RUT || '').toUpperCase();
                     form.obsercaviones = String(form.obsercaviones || '').toUpperCase();
                     form['DATOS DE FACTURACIÓN:'] = String(form['DATOS DE FACTURACIÓN:'] || '').toUpperCase();
                     form['tasa de cambio'] = form['tipo de cambio'] !== 'CLP' ? currentRate.value : 1;
@@ -730,7 +795,8 @@
                 subtotalNeto, uniqueProviders, folioError, maxAllowedValue, calculateMaxCorrelativo,
                 recordsListSorted, selectedFolioSelect, onFolioSelectChange, billingInfo,
                 scaleVal, previewWrapper, updateScale, previewScaleStyle,
-                showProviderDropdown, filteredProviders, toggleProviderDropdown, selectProvider, onProviderInput, closeProviderDropdownWithDelay
+                showProviderDropdown, filteredProviders, toggleProviderDropdown, selectProvider, onProviderInput, closeProviderDropdownWithDelay,
+                obsTextarea, factTextarea, resizeTextareas, providerRutMap
             };
         }
     }).mount('#app');
